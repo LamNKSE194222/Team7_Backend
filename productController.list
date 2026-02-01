@@ -1,0 +1,10 @@
+const pool = require("../config/database");
+
+async function list(req, res) {
+  const rs = await pool.query(
+    "SELECT product_id AS id, name, uom, sku, price FROM product WHERE is_active=true ORDER BY product_id DESC"
+  );
+  res.json({ success: true, data: rs.rows });
+}
+
+module.exports = { list };
