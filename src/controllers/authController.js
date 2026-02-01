@@ -2,6 +2,9 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_MINUTES = 10;
+
 async function login(req, res) {
     try {
         const { email, password } = req.body || {};
@@ -14,7 +17,6 @@ async function login(req, res) {
             });
         }
 
-        // Lấy user + nếu là franchise staff thì lấy store_id
         const rs = await pool.query(
             `
       SELECT 
@@ -23,6 +25,8 @@ async function login(req, res) {
         u.email,
         u.password AS password_hash,
         u.status,
+        u.failed_attempts,
+        u.locked_until,
         fs.franchise_store_id
       FROM "user" u
       LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
@@ -52,18 +56,78 @@ async function login(req, res) {
             });
         }
 
+        if (user.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
+            const remainMs = new Date(user.locked_until).getTime() - Date.now();
+            const remainSec = Math.ceil(remainMs / 1000);
+
+            return res.status(423).json({
+                success: false,
+                data: null,
+                message: `Tài khoản đang bị khóa tạm thời. Thử lại sau ${remainSec} giây.`,
+                error_code: "ACCOUNT_LOCKED",
+            });
+        }
+
         const ok = await bcrypt.compare(password, user.password_hash);
+
         if (!ok) {
+            const nextFailed = (user.failed_attempts || 0) + 1;
+
+            if (nextFailed >= MAX_FAILED_ATTEMPTS) {
+                const lockedUntil = new Date(Date.now() + LOCK_MINUTES * 60 * 1000);
+
+                await pool.query(
+                    `
+          UPDATE "user"
+          SET failed_attempts = $1,
+              locked_until = $2
+          WHERE user_id = $3
+          `,
+                    [nextFailed, lockedUntil, user.user_id]
+                );
+
+                return res.status(423).json({
+                    success: false,
+                    data: null,
+                    message: `Bạn đã nhập sai quá ${MAX_FAILED_ATTEMPTS} lần. Tài khoản bị khóa ${LOCK_MINUTES} phút.`,
+                    error_code: "ACCOUNT_LOCKED",
+                    failedAttempts: nextFailed,
+                    lockedUntil: lockedUntil.toISOString(),
+                });
+            }
+
+            await pool.query(
+                `
+        UPDATE "user"
+        SET failed_attempts = $1,
+            locked_until = NULL
+        WHERE user_id = $2
+        `,
+                [nextFailed, user.user_id]
+            );
+
             return res.status(401).json({
                 success: false,
                 data: null,
                 message: "Sai mật khẩu",
                 error_code: "INVALID_LOGIN",
+                failedAttempts: nextFailed,
+                remainingAttempts: MAX_FAILED_ATTEMPTS - nextFailed,
             });
         }
 
-        // Với Sprint 1: staff store login là chính
-        // franchise_store_id có thể null nếu user không phải franchise_staff
+        if ((user.failed_attempts || 0) > 0 || user.locked_until) {
+            await pool.query(
+                `
+        UPDATE "user"
+        SET failed_attempts = 0,
+            locked_until = NULL
+        WHERE user_id = $1
+        `,
+                [user.user_id]
+            );
+        }
+
         const token = jwt.sign(
             {
                 user_id: user.user_id,
