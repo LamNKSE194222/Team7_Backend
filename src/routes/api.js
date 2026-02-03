@@ -43,30 +43,56 @@ router.get("/franchiseStaff_dashboard", requireAuth, franchiseStaff_dashboardCon
 /**
  * @swagger
  * components:
- *      schema:
- *          dashboard:
- *              type: object
- *              properties:
- *                  _
- *          
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *   schemas:
+ *     Dashboard:
+ *       type: object
+ *       properties:
+ *         totalOrders:
+ *           type: integer
+ *           example: 120
+ *         totalRevenue:
+ *           type: number
+ *           example: 3500000
+ *         topProducts:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               product_id:
+ *                 type: integer
+ *                 example: 1
+ *               name:
+ *                 type: string
+ *                 example: "Mooncake Matcha"
+ *               sold:
+ *                 type: integer
+ *                 example: 45
  */
 
 /**
  * @swagger
  * /api/franchiseStaff_dashboard:
- * get:
- *      summary: To come to the dashboard of franchise staff
- *      description: this api is use to fetch data from database
- *      response: 
- *          200:
- *              description: this api is use to fetch data from database
- *              content:
- *                  application/json:
- *                      schema:
- *                          type: array
- *                          items:
- *                              $ref: #components/schema/dashboard
+ *   get:
+ *     summary: Franchise staff dashboard
+ *     description: Fetch dashboard data for franchise staff
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Dashboard'
+ *       401:
+ *         description: Unauthorized
  */
+
 
 router.post("/orders", requireAuth, orderController.create);
 router.get("/orders", requireAuth, orderController.list);
