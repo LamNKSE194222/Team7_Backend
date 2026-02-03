@@ -49,29 +49,69 @@ router.get("/franchiseStaff_dashboard", requireAuth, franchiseStaff_dashboardCon
  *       scheme: bearer
  *       bearerFormat: JWT
  *   schemas:
- *     Dashboard:
+ *     DashboardCards:
  *       type: object
  *       properties:
- *         totalOrders:
+ *         pending:
  *           type: integer
- *           example: 120
- *         totalRevenue:
- *           type: number
- *           example: 3500000
- *         topProducts:
+ *           example: 1
+ *         approved:
+ *           type: integer
+ *           example: 0
+ *         processing:
+ *           type: integer
+ *           example: 1
+ *         fulfilled:
+ *           type: integer
+ *           example: 1
+ *
+ *     RecentOrder:
+ *       type: object
+ *       properties:
+ *         order_id:
+ *           type: string
+ *           example: "1"
+ *         order_code:
+ *           type: string
+ *           example: "ORD-001"
+ *         status:
+ *           type: string
+ *           example: "pending"
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-28T13:05:33.480Z"
+ *         delivered_at:
+ *           type: string
+ *           nullable: true
+ *           format: date-time
+ *           example: null
+ *         product_count:
+ *           type: integer
+ *           example: 2
+ *
+ *     DashboardData:
+ *       type: object
+ *       properties:
+ *         cards:
+ *           $ref: '#/components/schemas/DashboardCards'
+ *         recent_orders:
  *           type: array
  *           items:
- *             type: object
- *             properties:
- *               product_id:
- *                 type: integer
- *                 example: 1
- *               name:
- *                 type: string
- *                 example: "Mooncake Matcha"
- *               sold:
- *                 type: integer
- *                 example: 45
+ *             $ref: '#/components/schemas/RecentOrder'
+ *
+ *     DashboardResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           $ref: '#/components/schemas/DashboardData'
+ *         message:
+ *           type: string
+ *           nullable: true
+ *           example: null
  */
 
 /**
