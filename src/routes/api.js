@@ -128,7 +128,7 @@ router.get("/franchiseStaff_dashboard", requireAuth, franchiseStaff_dashboardCon
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Dashboard'
+ *               $ref: '#/components/schemas/DashboardResponse'
  *       401:
  *         description: Unauthorized
  */
