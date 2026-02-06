@@ -1,5 +1,5 @@
 const { Pool } = require("pg");
-
+const connectionString = process.env.DATABASE_URL;
 // const pool = new Pool({
 //   host: process.env.DB_HOST,
 //   port: Number(process.env.DB_PORT || 5432),
@@ -8,11 +8,13 @@ const { Pool } = require("pg");
 //   database: process.env.DB_NAME,
 // });
 
+const useSSL =
+  process.env.NODE_ENV === "production" ||
+  process.env.PGSSLMODE === "require";
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production"
-    ? { rejectUnauthorized: false }
-    : false,
+  connectionString,
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
 });
 
 pool.on("error", (err) => {

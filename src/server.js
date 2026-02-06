@@ -9,6 +9,8 @@ const path = require("path");
 
 const apiRoutes = require("./routes/api");
 
+const port = process.env.PORT || 8001;
+
 const options = {
     definition: {
         openapi: '3.0.0',
@@ -17,15 +19,15 @@ const options = {
             version: '1.0.0'
         },
         servers: [
-            {
-                url: 'https://franchisemooncake.onrender.com'
-            }
+            { url: 'https://franchisemooncake.onrender.com' },
+            { url: `http://localhost:${port}` },
         ]
     },
     apis: [path.join(__dirname, "./routes/*.js")]
 }
 
 const app = express();
+
 
 const swaggerSpec = swaggerJSDoc(options)
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
@@ -36,6 +38,4 @@ app.use(express.json())
 
 app.use("/api", apiRoutes)
 
-
-const port = process.env.PORT || 8001;
 app.listen(port, () => console.log("API running on", port));

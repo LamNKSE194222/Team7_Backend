@@ -23,9 +23,11 @@ async function login(req, res) {
         u.email,
         u.password AS password_hash,
         u.status,
-        fs.franchise_store_id
+        fs.franchise_store_id,
+        ks.central_kitchen_id
       FROM "user" u
       LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
+      LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
       WHERE u.email = $1
       `,
             [email]
@@ -62,13 +64,20 @@ async function login(req, res) {
             });
         }
 
-        // Với Sprint 1: staff store login là chính
-        // franchise_store_id có thể null nếu user không phải franchise_staff
+        //phân quyền
+        let role = "user";
+
+        if (user.franchise_store_id) {
+            role = "franchise_staff";
+        } else if (user.central_kitchen_id) {
+            role = "kitchen_staff";
+        }
         const token = jwt.sign(
             {
                 user_id: user.user_id,
-                role: user.franchise_store_id ? "franchise_staff" : "user",
+                role,
                 franchise_store_id: user.franchise_store_id ?? null,
+                central_kitchen_id: user.central_kitchen_id ?? null,
             },
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
@@ -81,9 +90,10 @@ async function login(req, res) {
                 user: {
                     user_id: user.user_id,
                     username: user.username,
-                    email: user.email,
+                    email: user.email, role,
                     status: user.status,
                     franchise_store_id: user.franchise_store_id ?? null,
+                    central_kitchen_id: user.central_kitchen_id ?? null,
                 },
             },
             message: null,
