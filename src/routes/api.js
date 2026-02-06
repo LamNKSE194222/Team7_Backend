@@ -202,6 +202,38 @@ const { getOrders } = require("../controllers/orderController")
  *           properties:
  *             data:
  *               $ref: '#/components/schemas/OrderDetail'
+ *     CreateOrderItem:
+ *       type: object
+ *       required:
+ *         - product_id
+ *         - qty
+ *       properties:
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         qty:
+ *           type: number
+ *           example: 10
+ *
+ *     CreateOrderRequest:
+ *       type: object
+ *       required:
+ *         - desired_date
+ *         - items
+ *       properties:
+ *         desired_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-02-10T09:00:00Z"
+ *         note:
+ *           type: string
+ *           nullable: true
+ *           example: "Giao buổi sáng"
+ *         items:
+ *           type: array
+ *           minItems: 1
+ *           items:
+ *             $ref: '#/components/schemas/CreateOrderItem'
  */
 
 
@@ -395,9 +427,62 @@ router.get("/franchiseStaff_dashboard", requireAuth, Fdashboard);
 
 router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
 
+/**
+ * @swagger
+ * /api/CreateOrders:
+ *   post:
+ *     summary: Tạo đơn hàng mới (Franchise Staff)
+ *     description: Franchise staff tạo đơn hàng gửi về central kitchen
+ *     tags:
+ *       - Franchise Store
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateOrderRequest'
+ *           example:
+ *             desired_date: "2026-02-10T09:00:00Z"
+ *             note: "Giao buổi sáng"
+ *             items:
+ *               - product_id: 1
+ *                 qty: 10
+ *               - product_id: 2
+ *                 qty: 5
+ *     responses:
+ *       201:
+ *         description: Tạo đơn hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/BaseResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         order_id:
+ *                           type: string
+ *                           example: "10"
+ *                         order_code:
+ *                           type: string
+ *                           example: "ORD-1770384235884"
+ *                         status:
+ *                           type: string
+ *                           example: "pending"
+ *       400:
+ *         description: Lỗi validate dữ liệu
+ *       401:
+ *         description: Chưa đăng nhập
+ *       403:
+ *         description: Không phải franchise staff
+ */
 
 
-router.post("/CreatOrders", requireAuth, orderController.createOrder);
+router.post("/CreateOrders", requireAuth, orderController.createOrder);
 
 /**
  * @swagger
