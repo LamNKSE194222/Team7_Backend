@@ -37,10 +37,10 @@ async function createOrder(req, res) {
                 franchise_store_id,
                 created_by_staff_id,
                 status,
-                desired_date
+                desired_date,
                 note
             )
-            VALUES ($1, $2, $3, 'pending', $4)
+            VALUES ($1, $2, $3, 'pending', $4, $5)
             RETURNING order_id
             `,
             [
@@ -68,10 +68,11 @@ async function createOrder(req, res) {
 
             await client.query(
                 `
-                INSERT INTO order_item (order_id, product_id, qty, unit_price)
-                SELECT $1, $2, $3, price
+                INSERT INTO order_item (order_id, product_id, qty, unit_price, uom)
+                SELECT $1, $2, $3, price, uom
                 FROM product
                 WHERE product_id = $2
+                RETURNING order_item_id
                 `,
                 [orderId, item.product_id, item.qty]
             );
@@ -136,11 +137,6 @@ async function getOrders(req, res) {
         if (status) {
             params.push(status);
             whereClause += ` AND o.status = $${params.length}`;
-        }
-
-        if (keyword) {
-            params.push(`%${keyword}%`);
-            whereClause += ` AND o.order_code ILIKE $${params.length}`;
         }
 
         const rs = await pool.query(
