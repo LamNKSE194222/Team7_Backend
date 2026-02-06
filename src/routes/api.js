@@ -7,6 +7,8 @@ const productController = require("../controllers/productController");
 const orderController = require("../controllers/orderController");
 const { Fdashboard } = require("../controllers/franchiseStaff_dashboardController");
 const { Cdashboard } = require("../controllers/CentralKitchen_dashboardController");
+const { createOrder } = require("../controllers/orderController")
+const { getOrders } = require("../controllers/orderController")
 
 /**
  * @swagger
@@ -16,7 +18,19 @@ const { Cdashboard } = require("../controllers/CentralKitchen_dashboardControlle
  *       type: http
  *       scheme: bearer
  *       bearerFormat: JWT
+ *
  *   schemas:
+ *     BaseResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *
  *     DashboardCards:
  *       type: object
  *       properties:
@@ -33,7 +47,7 @@ const { Cdashboard } = require("../controllers/CentralKitchen_dashboardControlle
  *           type: integer
  *           example: 1
  *
- *     RecentOrder:
+ *     OrderSummary:
  *       type: object
  *       properties:
  *         order_id:
@@ -51,35 +65,143 @@ const { Cdashboard } = require("../controllers/CentralKitchen_dashboardControlle
  *           example: "2026-01-28T13:05:33.480Z"
  *         delivered_at:
  *           type: string
- *           nullable: true
  *           format: date-time
+ *           nullable: true
  *           example: null
+ *         desired_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-31T13:05:33.480Z"
  *         product_count:
  *           type: integer
  *           example: 2
+ *         store_name:
+ *           type: string
+ *           nullable: true
+ *           example: "Franchise Store - District 1"
+ *
+ *     OrderListItem:
+ *       type: object
+ *       properties:
+ *         order_id:
+ *           type: string
+ *           example: "1"
+ *         order_code:
+ *           type: string
+ *           example: "ORD-001"
+ *         status:
+ *           type: string
+ *           example: "pending"
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-28T13:05:33.480Z"
+ *         desired_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-31T13:05:33.480Z"
+ *         note:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         delivered_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           example: null
+ *         total_items:
+ *           type: string
+ *           example: "2"
+ *         product_names:
+ *           type: string
+ *           nullable: true
+ *           example: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
+ *
+ *     OrderItemDetail:
+ *       type: object
+ *       properties:
+ *         product_name:
+ *           type: string
+ *           example: "Mooncake - Mung Bean 150g"
+ *         qty:
+ *           type: number
+ *           example: 10
+ *         uom:
+ *           type: string
+ *           example: "piece"
+ *         unit_price:
+ *           type: number
+ *           example: 50000
+ *
+ *     OrderDetail:
+ *       type: object
+ *       properties:
+ *         order_id:
+ *           type: string
+ *           example: "1"
+ *         order_code:
+ *           type: string
+ *           example: "ORD-001"
+ *         status:
+ *           type: string
+ *           example: "pending"
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *         desired_date:
+ *           type: string
+ *           format: date-time
+ *         delivered_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *         note:
+ *           type: string
+ *           nullable: true
+ *         items:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/OrderItemDetail'
  *
  *     DashboardData:
  *       type: object
  *       properties:
  *         cards:
  *           $ref: '#/components/schemas/DashboardCards'
+ *         pending_orders:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/OrderSummary'
  *         recent_orders:
  *           type: array
  *           items:
- *             $ref: '#/components/schemas/RecentOrder'
+ *             $ref: '#/components/schemas/OrderSummary'
  *
  *     DashboardResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         data:
- *           $ref: '#/components/schemas/DashboardData'
- *         message:
- *           type: string
- *           nullable: true
- *           example: null
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               $ref: '#/components/schemas/DashboardData'
+ *
+ *     OrderListResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/OrderListItem'
+ *
+ *     OrderDetailResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               $ref: '#/components/schemas/OrderDetail'
  */
 
 
@@ -88,20 +210,33 @@ const { Cdashboard } = require("../controllers/CentralKitchen_dashboardControlle
  * /api/auth/login:
  *   post:
  *     summary: Login
+ *     tags:
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, password]
+ *             required:
+ *               - email
+ *               - password
  *             properties:
  *               email:
  *                 type: string
- *                 example: "storestaff1@moon.vn"
  *               password:
  *                 type: string
- *                 example: "123456"
+ *           examples:
+ *             franchise_staff:
+ *               summary: Franchise staff login
+ *               value:
+ *                 email: "storestaff1@moon.vn"
+ *                 password: "123456"
+ *             kitchen_staff:
+ *               summary: Kitchen staff login
+ *               value:
+ *                 email: "kitchen1@moon.vn"
+ *                 password: "123456"
  *     responses:
  *       200:
  *         description: Login success
@@ -262,9 +397,104 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
 
 
 
-router.post("/orders", requireAuth, orderController.create);
-router.get("/orders", requireAuth, orderController.list);
-router.get("/orders/:id", requireAuth, orderController.detail);
+router.post("/CreatOrders", requireAuth, orderController.createOrder);
+
+/**
+ * @swagger
+ * /api/ViewOrders:
+ *   get:
+ *     summary: Xem danh sách đơn hàng
+ *     description: |
+ *       Lấy danh sách đơn hàng của franchise store hiện tại.
+ *       - Chỉ franchise staff được phép truy cập
+ *       - Có thể lọc theo trạng thái đơn hàng hoặc tìm theo mã đơn
+ *     tags:
+ *       - Franchise Store
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         description: Lọc theo trạng thái đơn hàng
+ *         schema:
+ *           type: string
+ *           enum:
+ *             - pending
+ *             - approved
+ *             - processing
+ *             - fulfilled
+ *             - cancelled
+ *       - in: query
+ *         name: keyword
+ *         required: false
+ *         description: Tìm kiếm theo mã đơn hàng (order_code)
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách đơn hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       order_id:
+ *                         type: string
+ *                         example: "1"
+ *                       order_code:
+ *                         type: string
+ *                         example: "ORD-001"
+ *                       status:
+ *                         type: string
+ *                         example: "pending"
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-01-28T13:05:33.480Z"
+ *                       desired_date:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-01-31T13:05:33.480Z"
+ *                       note:
+ *                         type: string
+ *                         nullable: true
+ *                         example: null
+ *                       delivered_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         example: null
+ *                       total_items:
+ *                         type: string
+ *                         example: "2"
+ *                       product_names:
+ *                         type: string
+ *                         nullable: true
+ *                         example: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *       401:
+ *         description: Unauthorized - Chưa đăng nhập
+ *       403:
+ *         description: Forbidden - Không có quyền xem đơn hàng
+ *       500:
+ *         description: Server error
+ */
+
+
+router.get("/ViewOrders", requireAuth, orderController.getOrders);
+
 
 router.get("/health/db", async (req, res) => {
     try {
