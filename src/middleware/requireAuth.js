@@ -6,6 +6,7 @@ function requireAuth(req, res, next) {
 
     if (!token) return res.status(401).json({ success: false, message: "Missing token" });
 
+
     try {
         req.user = jwt.verify(token, process.env.JWT_SECRET);
         next();

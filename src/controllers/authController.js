@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 
+//Login user
 async function login(req, res) {
     try {
         const { email, password } = req.body || {};
@@ -113,4 +114,9 @@ async function me(req, res) {
     return res.json({ success: true, data: req.user, message: null });
 }
 
-module.exports = { login, me };
+// Logout user
+async function logout(req, res) {
+    return res.json({ success: true, data: null, message: "Đăng xuất thành công" });
+}
+
+module.exports = { login, me, logout };

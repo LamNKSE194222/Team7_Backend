@@ -278,6 +278,7 @@ const { getOrders } = require("../controllers/orderController")
 
 router.post("/auth/login", authController.login);
 router.get("/auth/me", requireAuth, authController.me);
+router.post("/auth/logout", requireAuth, authController.logout);
 router.get("/products", requireAuth, productController.list);
 
 /**
