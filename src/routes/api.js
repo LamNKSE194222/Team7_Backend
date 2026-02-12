@@ -279,6 +279,58 @@ const { requireKitchenStaff } = require("../middleware/requireKitchenStaff");
  */
 
 router.post("/auth/login", authController.login);
+
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Profile của user hiện tại (từ JWT)
+ *     description: |
+ *       Trả về thông tin user đã đăng nhập từ token.
+ *       Dùng chung cho mọi nghiệp vụ (franchise_staff / kitchen_staff / manager / user).
+ *     tags:
+ *       - Auth
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                       example: "3"
+ *                     role:
+ *                       type: string
+ *                       example: "kitchen_staff"
+ *                     franchise_store_id:
+ *                       nullable: true
+ *                       example: null
+ *                     central_kitchen_id:
+ *                       nullable: true
+ *                       example: "2"
+ *                     iat:
+ *                       type: integer
+ *                       example: 1770651752
+ *                     exp:
+ *                       type: integer
+ *                       example: 1771256552
+ *                 message:
+ *                   nullable: true
+ *                   example: null
+ *       401:
+ *         description: Unauthorized (không có token / token sai)
+ */
+
 router.get("/auth/me", requireAuth, authController.me);
 router.post("/auth/logout", requireAuth, authController.logout);
 router.get("/products", requireAuth, productController.list);
@@ -585,12 +637,12 @@ router.get("/ViewOrders", requireAuth, orderController.getOrders);
 
 
 router.get("/health/db", async (req, res) => {
-    try {
-        const r = await pool.query("SELECT NOW() as now");
-        res.json({ ok: true, now: r.rows[0].now });
-    } catch (e) {
-        res.status(500).json({ ok: false, error: e.message });
-    }
+  try {
+    const r = await pool.query("SELECT NOW() as now");
+    res.json({ ok: true, now: r.rows[0].now });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 /**
  * @swagger
