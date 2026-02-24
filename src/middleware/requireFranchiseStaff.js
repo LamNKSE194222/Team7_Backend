@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const pool = require("../config/database");
 
 async function requireFranchiseStaff(req, res, next) {
@@ -32,6 +33,22 @@ async function requireFranchiseStaff(req, res, next) {
         console.error(err);
         return res.status(500).json({ success: false, message: "Server error" });
     }
+=======
+function requireFranchiseStaff(req, res, next) {
+    if (!req.user) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    if (!req.user.franchise_store_id) {
+        return res.status(403).json({
+            success: false,
+            message: "Chỉ franchise staff mới được phép truy cập",
+            error_code: "FORBIDDEN",
+        });
+    }
+
+    next();
+>>>>>>> c8a5a0060766fab4d2674459453b8c976fa4a8e9
 }
 
 module.exports = { requireFranchiseStaff };
