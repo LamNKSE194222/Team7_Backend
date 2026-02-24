@@ -4,13 +4,18 @@ const pool = require("../config/database");
 const { requireAuth } = require("../middleware/requireAuth");
 const authController = require("../controllers/authController");
 const productController = require("../controllers/productController");
-const orderController = require("../controllers/orderController");
+const orderController = require("../controllers/orderController.js");
 const { Fdashboard } = require("../controllers/franchiseStaff_dashboardController");
 const { Cdashboard } = require("../controllers/CentralKitchen_dashboardController");
-const { createOrder } = require("../controllers/orderController")
-const { getOrders } = require("../controllers/orderController")
+const { createOrder, getOrders } = require("../controllers/orderController.js");
 const CentralKitchen_CreateOrders = require("../controllers/CentralKitchen_CreateOrders");
 const { requireKitchenStaff } = require("../middleware/requireKitchenStaff");
+const CentralKitChenReportController = require("../controllers/CentralKitChenReportController.js");
+const profileController = require("../controllers/profileController.js");
+const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
+const franchiseInventoryController = require("../controllers/franchiseInventoryController");
+
+
 
 /**
  * @swagger
@@ -536,12 +541,12 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
  *         description: Không phải franchise staff
  */
 
-
-router.post("/CreateOrders", requireAuth, orderController.createOrder);
+router.post("/CreateOrders", requireAuth, createOrder);
+router.get("/ViewOrders", requireAuth, getOrders);
 
 /**
  * @swagger
- * /api/ViewOrders:
+ * /api/ViewOrders: 
  *   get:
  *     summary: Xem danh sách đơn hàng
  *     description: |
@@ -746,10 +751,491 @@ router.get("/health/db", async (req, res) => {
  */
 
 
+
 // Central Kitchen - New Orders page
 router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.listNewOrders);
 router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.getNewOrderDetail);
 router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.acceptNewOrder);
 router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.rejectNewOrder);
+
+/**
+ * @swagger
+ * /api/profile:
+ *   patch:
+ *     summary: Cập nhật profile cơ bản (username)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 example: "Kitchen Staff 01 (updated)"
+ *     responses:
+ *       200:
+ *         description: OK
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
+router.patch("/profile", requireAuth, profileController.updateProfile);
+
+/**
+ * @swagger
+ * /api/profile/change-password:
+ *   patch:
+ *     summary: Đổi mật khẩu
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [current_password, new_password]
+ *             properties:
+ *               current_password:
+ *                 type: string
+ *                 example: "123456"
+ *               new_password:
+ *                 type: string
+ *                 example: "newpass123"
+ *     responses:
+ *       200:
+ *         description: OK
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized / wrong current password
+ */
+router.patch("/profile/change-password", requireAuth, profileController.changePassword);
+
+/**
+ * @swagger
+ * /api/centralKitchen/report/dashboard:
+ *   get:
+ *     summary: Central Kitchen - Report Dashboard (cards + pending + low stock)
+ *     tags: [Central Kitchen]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: pending_limit
+ *         schema: { type: integer, example: 5 }
+ *         description: Số lượng đơn pending trả về
+ *       - in: query
+ *         name: threshold
+ *         schema: { type: number, example: 5 }
+ *         description: Ngưỡng cảnh báo tồn kho (available_qty <= threshold)
+ *       - in: query
+ *         name: low_stock_limit
+ *         schema: { type: integer, example: 5 }
+ *         description: Số lượng cảnh báo tồn kho trả về
+ *     responses:
+ *       200:
+ *         description: OK
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not kitchen staff)
+ */
+router.get("/centralKitchen/report/dashboard", requireAuth, requireKitchenStaff, CentralKitChenReportController.dashboardReport);
+
+/**
+ * @swagger
+ * /api/centralKitchen/report/summary:
+ *   get:
+ *     summary: Central Kitchen - Summary report theo khoảng thời gian
+ *     tags: [Central Kitchen]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         required: true
+ *         schema: { type: string, format: date-time, example: "2026-01-01T00:00:00Z" }
+ *       - in: query
+ *         name: to
+ *         required: true
+ *         schema: { type: string, format: date-time, example: "2026-02-01T00:00:00Z" }
+ *     responses:
+ *       200:
+ *         description: OK
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not kitchen staff)
+ */
+router.get("/centralKitchen/report/summary", requireAuth, requireKitchenStaff, CentralKitChenReportController.summaryReport);
+
+/**
+ * @swagger
+ * components:
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *
+ *   schemas:
+ *     BaseResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           nullable: true
+ *         message:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         error_code:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *
+ *     StorageItem:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: string
+ *           example: "2"
+ *         product_id:
+ *           type: string
+ *           example: "1"
+ *         product_code:
+ *           type: string
+ *           example: "SKU-MC-MUNG-150"
+ *         product_name:
+ *           type: string
+ *           example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *         category_name:
+ *           type: string
+ *           example: "Mooncake"
+ *         quantity:
+ *           type: string
+ *           description: "available = on_hand_qty - reserved_qty (Postgres numeric thường trả dạng string)"
+ *           example: "70.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date
+ *           nullable: true
+ *           example: null
+ *
+ *     AdjustInventoryItemRequest:
+ *       type: object
+ *       required: [delta]
+ *       properties:
+ *         delta:
+ *           type: number
+ *           description: "Số lượng điều chỉnh. Dương = cộng thêm, âm = trừ bớt. Không được bằng 0."
+ *           example: -5
+ *
+ *     AdjustInventoryItemResult:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: integer
+ *           example: 2
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         old_qty:
+ *           type: number
+ *           example: 70
+ *         new_qty:
+ *           type: number
+ *           example: 65
+ *         adjusted_by_staff_id:
+ *           type: integer
+ *           example: 10
+ *
+ *     SeedInventoryItemRequest:
+ *       type: object
+ *       required: [product_id, qty]
+ *       properties:
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         qty:
+ *           type: number
+ *           example: 100
+ *
+ *     FranchiseInventoryItemRow:
+ *       type: object
+ *       description: "RETURNING * từ bảng franchise_inventory_item"
+ *       properties:
+ *         inventory_item_id:
+ *           type: integer
+ *           example: 2
+ *         inventory_id:
+ *           type: integer
+ *           example: 1
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         on_hand_qty:
+ *           type: string
+ *           example: "100.000"
+ *         reserved_qty:
+ *           type: string
+ *           example: "0.000"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           example: "2026-02-24T07:15:00.000Z"
+ *
+ * tags:
+ *   - name: Franchise Inventory
+ *     description: API kho cho franchise staff
+ */
+
+/**
+ * @swagger
+ * /api/franchise/inventory/storage:
+ *   get:
+ *     tags: [Franchise Inventory]
+ *     summary: Lấy danh sách tồn kho (storage) của cửa hàng franchise hiện tại
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy storage thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/StorageItem'
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *             example:
+ *               success: true
+ *               data:
+ *                 - inventory_item_id: "2"
+ *                   product_id: "1"
+ *                   product_code: "SKU-MC-MUNG-150"
+ *                   product_name: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                   category_name: "Mooncake"
+ *                   quantity: "70.000"
+ *                   expiry_date: null
+ *               message: null
+ *       401:
+ *         description: Chưa đăng nhập / token không hợp lệ
+ *       403:
+ *         description: Không đúng role franchise staff
+ *       500:
+ *         description: Server/DB error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/BaseResponse'
+ *             example:
+ *               success: false
+ *               data: null
+ *               message: "Server/DB error"
+ *               error_code: "SERVER_ERROR"
+ */
+router.get("/franchise/inventory/storage", requireAuth, requireFranchiseStaff, franchiseInventoryController.getStorage);
+
+/**
+ * @swagger
+ * /api/franchise/inventory/items/{inventoryItemId}/adjust:
+ *   post:
+ *     tags: [Franchise Inventory]
+ *     summary: Điều chỉnh số lượng on_hand_qty của 1 inventory item (+/-)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: inventoryItemId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 2
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdjustInventoryItemRequest'
+ *           example:
+ *             delta: -5
+ *     responses:
+ *       200:
+ *         description: Adjust thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/AdjustInventoryItemResult'
+ *                 message:
+ *                   type: string
+ *                   example: "Adjusted"
+ *             example:
+ *               success: true
+ *               data:
+ *                 inventory_item_id: 2
+ *                 product_id: 1
+ *                 old_qty: 70
+ *                 new_qty: 65
+ *                 adjusted_by_staff_id: 10
+ *               message: "Adjusted"
+ *       400:
+ *         description: Validation error hoặc không đủ tồn để trừ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/BaseResponse'
+ *             examples:
+ *               invalidInput:
+ *                 summary: delta không hợp lệ
+ *                 value:
+ *                   success: false
+ *                   data: null
+ *                   message: "delta phải là number và khác 0"
+ *                   error_code: "VALIDATION_ERROR"
+ *               insufficientStock:
+ *                 summary: Không đủ tồn để trừ
+ *                 value:
+ *                   success: false
+ *                   data: null
+ *                   message: "Không đủ tồn để trừ"
+ *                   error_code: "INSUFFICIENT_STOCK"
+ *       404:
+ *         description: Inventory item không tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/BaseResponse'
+ *             example:
+ *               success: false
+ *               data: null
+ *               message: "Inventory item không tồn tại"
+ *               error_code: "NOT_FOUND"
+ *       401:
+ *         description: Chưa đăng nhập / token không hợp lệ
+ *       403:
+ *         description: Không đúng role franchise staff
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/BaseResponse'
+ *             example:
+ *               success: false
+ *               data: null
+ *               message: "Internal server error"
+ *               error_code: "INTERNAL_ERROR"
+ */
+router.post("/franchise/inventory/items/:inventoryItemId/adjust", requireAuth, requireFranchiseStaff, franchiseInventoryController.adjustItem);
+
+/**
+ * @swagger
+ * /api/dev/franchise/inventory/seed:
+ *   post:
+ *     tags: [Franchise Inventory]
+ *     summary: Seed 1 product vào kho của store hiện tại (insert/update franchise_inventory_item)
+ *     description: Insert vào franchise_inventory_item, nếu trùng (inventory_id, product_id) thì update on_hand_qty.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SeedInventoryItemRequest'
+ *           example:
+ *             product_id: 1
+ *             qty: 100
+ *     responses:
+ *       200:
+ *         description: Seed thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/FranchiseInventoryItemRow'
+ *                 message:
+ *                   type: string
+ *                   example: "Seed thành công"
+ *             example:
+ *               success: true
+ *               data:
+ *                 inventory_item_id: 2
+ *                 inventory_id: 1
+ *                 product_id: 1
+ *                 on_hand_qty: "100.000"
+ *                 reserved_qty: "0.000"
+ *                 last_updated_at: "2026-02-24T07:15:00.000Z"
+ *               message: "Seed thành công"
+ *       400:
+ *         description: Store chưa có inventory
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Store chưa có inventory"
+ *       401:
+ *         description: Chưa đăng nhập / token không hợp lệ
+ *       403:
+ *         description: Không đúng role franchise staff
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Server error"
+ */
+router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff, franchiseInventoryController.seedInventoryItem);
 
 module.exports = router;
