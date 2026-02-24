@@ -271,6 +271,16 @@ const { requireKitchenStaff } = require("../middleware/requireKitchenStaff");
  *               value:
  *                 email: "kitchen1@moon.vn"
  *                 password: "123456"
+ *             manager:
+ *               summary: Manager login
+ *               value:
+ *                 email: "manager1@moon.vn"
+ *                 password: "123456"
+ *             admin:
+ *               summary: Admin login
+ *               value:
+ *                 email: "admin@moon.vn"
+ *                 password: "123456"
  *     responses:
  *       200:
  *         description: Login success

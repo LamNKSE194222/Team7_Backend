@@ -25,10 +25,13 @@ async function login(req, res) {
         u.password AS password_hash,
         u.status,
         fs.franchise_store_id,
-        ks.central_kitchen_id
+        ks.central_kitchen_id,
+        m.manager_code,
+        m.is_admin
       FROM "user" u
       LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
       LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
+      LEFT JOIN manager m ON m.user_id = u.user_id
       WHERE u.email = $1
       `,
             [email]
@@ -68,7 +71,9 @@ async function login(req, res) {
         //phân quyền
         let role = "user";
 
-        if (user.franchise_store_id) {
+        if (user.manager_code) {
+            role = user.is_admin ? "admin" : "manager";
+        } else if (user.franchise_store_id) {
             role = "franchise_staff";
         } else if (user.central_kitchen_id) {
             role = "kitchen_staff";
@@ -79,6 +84,8 @@ async function login(req, res) {
                 role,
                 franchise_store_id: user.franchise_store_id ?? null,
                 central_kitchen_id: user.central_kitchen_id ?? null,
+                manager_code: user.manager_code ?? null,
+                is_admin: user.manager_code ? !!user.is_admin : null,
             },
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
@@ -171,7 +178,8 @@ async function me(req, res) {
 
         // Xác định role (ưu tiên franchise_staff nếu có, nếu không thì kitchen_staff)
         let role = "user";
-        if (u.franchise_store_id) role = "franchise_staff";
+        if (u.manager_code) role = u.is_admin ? "admin" : "manager";
+        else if (u.franchise_store_id) role = "franchise_staff";
         else if (u.central_kitchen_id) role = "kitchen_staff";
 
         // Chuẩn hóa data trả về cho FE (profile page dùng chung)
