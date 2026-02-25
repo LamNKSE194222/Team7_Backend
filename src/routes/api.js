@@ -348,6 +348,98 @@ router.post("/auth/login", authController.login);
 
 router.get("/auth/me", requireAuth, authController.me);
 router.post("/auth/logout", requireAuth, authController.logout);
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Product
+ *     description: Product APIs
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Product:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         name:
+ *           type: string
+ *           example: "Mooncake - Mung Bean 150g"
+ *         uom:
+ *           type: string
+ *           example: "piece"
+ *         sku:
+ *           type: string
+ *           example: "SKU-MC-MUNG-150"
+ *         price:
+ *           type: number
+ *           example: 50000
+ *         description:
+ *           type: string
+ *           nullable: true
+ *           example: "Bánh trung thu nhân đậu xanh 150g"
+ *
+ *     ProductListResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Product'
+ */
+
+/**
+ * @swagger
+ * /api/products:
+ *   get:
+ *     summary: Lấy danh sách sản phẩm (chỉ active)
+ *     description: Trả về danh sách product có is_active = TRUE, sắp xếp theo product_id DESC.
+ *     tags: [Product]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ProductListResponse'
+ *             example:
+ *               success: true
+ *               data:
+ *                 - id: 2
+ *                   name: "Mooncake - Mixed Nuts 150g"
+ *                   uom: "piece"
+ *                   sku: "SKU-MC-NUTS-150"
+ *                   price: 60000
+ *                   description: "Bánh trung thu thập cẩm 150g"
+ *                 - id: 1
+ *                   name: "Mooncake - Mung Bean 150g"
+ *                   uom: "piece"
+ *                   sku: "SKU-MC-MUNG-150"
+ *                   price: 50000
+ *                   description: "Bánh trung thu nhân đậu xanh 150g"
+ *               message: null
+ *       401:
+ *         description: Unauthorized (không có token / token sai)
+ *       500:
+ *         description: DB error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/BaseResponse'
+ *             example:
+ *               success: false
+ *               data: null
+ *               message: "DB error"
+ */
 router.get("/products", requireAuth, productController.list);
 
 /**
@@ -686,7 +778,7 @@ router.get("/health/db", async (req, res) => {
  *       401: { description: Unauthorized }
  *       403: { description: Forbidden }
  */
-
+router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.listNewOrders);
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}:
@@ -706,7 +798,7 @@ router.get("/health/db", async (req, res) => {
  *       403: { description: Forbidden }
  *       404: { description: Not Found }
  */
-
+router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.getNewOrderDetail);
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/approve:
@@ -726,7 +818,7 @@ router.get("/health/db", async (req, res) => {
  *       403: { description: Forbidden }
  *       409: { description: Conflict }
  */
-
+router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.acceptNewOrder);
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/reject:
@@ -759,13 +851,6 @@ router.get("/health/db", async (req, res) => {
  *       403: { description: Forbidden }
  *       409: { description: Conflict }
  */
-
-
-
-// Central Kitchen - New Orders page
-router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.listNewOrders);
-router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.getNewOrderDetail);
-router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.acceptNewOrder);
 router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.rejectNewOrder);
 
 /**
