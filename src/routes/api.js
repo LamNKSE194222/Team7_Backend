@@ -15,6 +15,7 @@ const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
+const centralKitchenOrderStatusController = require("../controllers/centralKitchenOrderStatusController");
 
 
 /**
@@ -779,6 +780,32 @@ router.get("/health/db", async (req, res) => {
  *       403: { description: Forbidden }
  */
 router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.listNewOrders);
+
+/**
+ * @swagger
+ * /api/centralKitchen/orders/status:
+ *   get:
+ *     summary: Central Kitchen - Danh sách đơn theo trạng thái (tab)
+ *     tags: [Central Kitchen]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [approved, processing, fulfilled]
+ *         example: processing
+ *     responses:
+ *       200:
+ *         description: OK
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not kitchen staff)
+ */
+router.get("/centralKitchen/orders/status", requireAuth, requireKitchenStaff, centralKitchenOrderStatusController.listByStatus);
+
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}:
@@ -1452,5 +1479,33 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  *         description: Server error
  */
 router.get("/franchise/orders/receive-confirm", requireAuth, requireFranchiseStaff, receiveConfirmController.listOrders);
+
+
+/**
+ * @swagger
+ * /api/centralKitchen/orders/{orderId}/start-processing:
+ *   post:
+ *     summary: Central Kitchen - Bắt đầu chuẩn bị (approved -> processing)
+ *     tags: [Central Kitchen]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema: { type: integer }
+ *         example: 4
+ *     responses:
+ *       200:
+ *         description: OK
+ *       400:
+ *         description: Đơn không ở approved
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not Found
+ */
+router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, centralKitchenOrderStatusController.readyToDeliver);
 
 module.exports = router;
