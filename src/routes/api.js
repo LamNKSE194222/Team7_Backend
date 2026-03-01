@@ -1480,7 +1480,7 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  */
 router.get("/franchise/orders/receive-confirm", requireAuth, requireFranchiseStaff, receiveConfirmController.listOrders);
 
-
+router.post("/centralKitchen/orders/:orderId/start-processing", requireAuth, requireKitchenStaff, centralKitchenOrderStatusController.startProcessing);
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/start-processing:
