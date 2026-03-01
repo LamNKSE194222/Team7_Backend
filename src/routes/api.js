@@ -15,7 +15,7 @@ const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
-const centralKitchenOrderStatusController = require("../controllers/centralKitchenOrderStatusController");
+const CentralKitchenOrderStatusController = require("../controllers/CentralKitchenOrderStatusController");
 
 
 /**
@@ -804,7 +804,7 @@ router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, Centr
  *       403:
  *         description: Forbidden (not kitchen staff)
  */
-router.get("/centralKitchen/orders/status", requireAuth, requireKitchenStaff, centralKitchenOrderStatusController.listByStatus);
+router.get("/centralKitchen/orders/status", requireAuth, requireKitchenStaff, CentralKitchenOrderStatusController.listByStatus);
 
 /**
  * @swagger
@@ -1480,7 +1480,7 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  */
 router.get("/franchise/orders/receive-confirm", requireAuth, requireFranchiseStaff, receiveConfirmController.listOrders);
 
-router.post("/centralKitchen/orders/:orderId/start-processing", requireAuth, requireKitchenStaff, centralKitchenOrderStatusController.startProcessing);
+router.post("/centralKitchen/orders/:orderId/start-processing", requireAuth, requireKitchenStaff, CentralKitchenOrderStatusController.startProcessing);
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/start-processing:
@@ -1506,6 +1506,6 @@ router.post("/centralKitchen/orders/:orderId/start-processing", requireAuth, req
  *       404:
  *         description: Not Found
  */
-router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, centralKitchenOrderStatusController.readyToDeliver);
+router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, CentralKitchenOrderStatusController.readyToDeliver);
 
 module.exports = router;
