@@ -644,7 +644,6 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
  */
 
 router.post("/CreateOrders", requireAuth, createOrder);
-router.get("/ViewOrders", requireAuth, getOrders);
 
 /**
  * @swagger
@@ -739,9 +738,7 @@ router.get("/ViewOrders", requireAuth, getOrders);
  *         description: Server error
  */
 
-
-router.get("/ViewOrders", requireAuth, orderController.getOrders);
-
+router.get("/ViewOrders", requireAuth, getOrders);
 
 router.get("/health/db", async (req, res) => {
     try {
