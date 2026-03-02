@@ -14,7 +14,8 @@ const CentralKitChenReportController = require("../controllers/CentralKitChenRep
 const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
-
+const receiveConfirmController = require("../controllers/receiveConfirmController");
+const CentralKitchenOrderStatusController = require("../controllers/CentralKitchenOrderStatusController");
 
 
 /**
@@ -776,6 +777,32 @@ router.get("/health/db", async (req, res) => {
  *       403: { description: Forbidden }
  */
 router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.listNewOrders);
+
+/**
+ * @swagger
+ * /api/centralKitchen/orders/status:
+ *   get:
+ *     summary: Central Kitchen - Danh sách đơn theo trạng thái (tab)
+ *     tags: [Central Kitchen]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [approved, processing, fulfilled]
+ *         example: processing
+ *     responses:
+ *       200:
+ *         description: OK
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (not kitchen staff)
+ */
+router.get("/centralKitchen/orders/status", requireAuth, requireKitchenStaff, CentralKitchenOrderStatusController.listByStatus);
+
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}:
@@ -849,67 +876,6 @@ router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitch
  *       409: { description: Conflict }
  */
 router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.rejectNewOrder);
-
-/**
- * @swagger
- * /api/profile:
- *   patch:
- *     summary: Cập nhật profile cơ bản (username)
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [username]
- *             properties:
- *               username:
- *                 type: string
- *                 example: "Kitchen Staff 01 (updated)"
- *     responses:
- *       200:
- *         description: OK
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- */
-router.patch("/profile", requireAuth, profileController.updateProfile);
-
-/**
- * @swagger
- * /api/profile/change-password:
- *   patch:
- *     summary: Đổi mật khẩu
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [current_password, new_password]
- *             properties:
- *               current_password:
- *                 type: string
- *                 example: "123456"
- *               new_password:
- *                 type: string
- *                 example: "newpass123"
- *     responses:
- *       200:
- *         description: OK
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized / wrong current password
- */
-router.patch("/profile/change-password", requireAuth, profileController.changePassword);
 
 /**
  * @swagger
@@ -1329,5 +1295,214 @@ router.post("/franchise/inventory/items/:inventoryItemId/adjust", requireAuth, r
  *                   example: "Server error"
  */
 router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff, franchiseInventoryController.seedInventoryItem);
+
+/**
+ * @swagger
+ * /api/orders/{orderId}/confirm-receipt:
+ *   post:
+ *     summary: Franchise staff xác nhận nhận hàng & gửi đánh giá (fulfilled -> confirmed)
+ *     description: |
+ *       Franchise staff xác nhận đã nhận hàng cho 1 đơn hàng đã giao (status = fulfilled),
+ *       đồng thời gửi đánh giá (rating + comment).
+ *       - Chỉ cho phép khi order thuộc franchise_store_id của staff
+ *       - Chỉ cho phép khi status = fulfilled
+ *       - Thành công sẽ chuyển status -> confirmed
+ *     tags:
+ *       - Franchise Store
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 4
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [rating]
+ *             properties:
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 5
+ *               comment:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 1000
+ *                 example: "ok"
+ *     responses:
+ *       200:
+ *         description: Confirm thành công (status -> confirmed)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Đã xác nhận nhận hàng"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     order_id:
+ *                       type: integer
+ *                       example: 4
+ *                     order_code:
+ *                       type: string
+ *                       example: "ORD-006"
+ *                     status:
+ *                       type: string
+ *                       example: "confirmed"
+ *                     received_confirmed_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-02-27T10:20:00.000Z"
+ *       400:
+ *         description: Validate lỗi hoặc đơn không ở trạng thái fulfilled
+ *         content:
+ *           application/json:
+ *             examples:
+ *               invalidRating:
+ *                 summary: rating không hợp lệ
+ *                 value:
+ *                   success: false
+ *                   message: "rating phải từ 1 đến 5"
+ *               notFulfilled:
+ *                 summary: đơn chưa fulfilled
+ *                 value:
+ *                   success: false
+ *                   message: "Chỉ xác nhận khi đơn ở trạng thái fulfilled"
+ *       401:
+ *         description: Unauthorized (không có token / token sai)
+ *       403:
+ *         description: Forbidden (không phải franchise staff / đơn không thuộc store)
+ *       404:
+ *         description: Không tìm thấy đơn hàng
+ *       500:
+ *         description: Server error
+ */
+router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseStaff, receiveConfirmController.confirmReceipt);
+
+/**
+ * @swagger
+ * /api/franchise/orders/receive-confirm:
+ *   get:
+ *     summary: Danh sách đơn cho màn Xác nhận nhận hàng (Tất cả/Đã giao/Đã xác nhận)
+ *     description: |
+ *       Trả về danh sách đơn của franchise store hiện tại để hiển thị trên màn "Xác nhận nhận hàng".
+ *       filter:
+ *       - all: (fulfilled + confirmed)
+ *       - delivered: fulfilled
+ *       - confirmed: confirmed
+ *     tags: [Franchise Store]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: filter
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [all, delivered, confirmed]
+ *         example: delivered
+ *       - in: query
+ *         name: keyword
+ *         required: false
+ *         schema:
+ *           type: string
+ *         example: "ORD-00"
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         example: 20
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       order_id:
+ *                         type: integer
+ *                         example: 4
+ *                       order_code:
+ *                         type: string
+ *                         example: "ORD-006"
+ *                       status:
+ *                         type: string
+ *                         example: "fulfilled"
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       delivered_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       received_confirmed_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (franchise staff only)
+ *       500:
+ *         description: Server error
+ */
+router.get("/franchise/orders/receive-confirm", requireAuth, requireFranchiseStaff, receiveConfirmController.listOrders);
+
+router.post("/centralKitchen/orders/:orderId/start-processing", requireAuth, requireKitchenStaff, CentralKitchenOrderStatusController.startProcessing);
+/**
+ * @swagger
+ * /api/centralKitchen/orders/{orderId}/start-processing:
+ *   post:
+ *     summary: Central Kitchen - Bắt đầu chuẩn bị (approved -> processing)
+ *     tags: [Central Kitchen]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema: { type: integer }
+ *         example: 4
+ *     responses:
+ *       200:
+ *         description: OK
+ *       400:
+ *         description: Đơn không ở approved
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not Found
+ */
+router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, CentralKitchenOrderStatusController.readyToDeliver);
 
 module.exports = router;
