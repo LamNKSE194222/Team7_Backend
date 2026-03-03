@@ -241,6 +241,77 @@ const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralK
  *           minItems: 1
  *           items:
  *             $ref: '#/components/schemas/CreateOrderItem'
+ * 
+ *     CkExpiringMaterialRow:
+ *       type: object
+ *       properties:
+ *         material_id:
+ *           type: string
+ *           example: "2"
+ *         material_name:
+ *           type: string
+ *           example: "Đậu xanh đã cà vỏ"
+ *         uom:
+ *           type: string
+ *           example: "kg"
+ *         on_hand_qty:
+ *           type: string
+ *           example: "200.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-04-14T17:00:00.000Z"
+ *         days_left:
+ *           type: integer
+ *           example: 43
+ *         inventory_code:
+ *           type: string
+ *           example: "CK-INV-001"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-03-02T13:32:22.818Z"
+ *
+ *     CkInventoryMaterialRow:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: string
+ *           example: "2"
+ *         material_id:
+ *           type: string
+ *           example: "2"
+ *         material_name:
+ *           type: string
+ *           example: "Đậu xanh đã cà vỏ"
+ *         uom:
+ *           type: string
+ *           example: "kg"
+ *         on_hand_qty:
+ *           type: string
+ *           example: "200.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-04-14T17:00:00.000Z"
+ *         days_left:
+ *           type: integer
+ *           example: 43
+ *         inventory_code:
+ *           type: string
+ *           example: "CK-INV-001"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-03-02T13:32:22.818Z"
+ *
+ *     CentralKitchenDashboardResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               $ref: '#/components/schemas/DashboardData'
  */
 
 
