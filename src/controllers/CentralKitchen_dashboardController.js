@@ -80,30 +80,31 @@ async function Cdashboard(req, res) {
             [kitchenId]
         );
 
-        // 4) Cảnh báo tồn kho (vì schema bạn chỉ có tồn kho ở franchise_inventory)
-        // Mình làm alert "available_qty = on_hand - reserved" thấp (<= threshold)
-        const threshold = Number(req.query.threshold || 5);
+        // 4) Cảnh báo tồn kho 
+        const expiryDays = Number(req.query.expiry_days ?? 60);
 
-        const lowStockRs = await pool.query(
+        const expiringRs = await pool.query(
             `
-      SELECT
-        fs.franchise_store_id,
-        fs.name AS store_name,
-        p.product_id,
-        p.name AS product_name,
-        (fii.on_hand_qty - fii.reserved_qty) AS available_qty,
-        fii.on_hand_qty,
-        fii.reserved_qty,
-        fii.last_updated_at
-      FROM franchise_inventory_item fii
-      JOIN franchise_inventory fi ON fi.inventory_id = fii.inventory_id
-      JOIN franchise_store fs ON fs.franchise_store_id = fi.franchise_store_id
-      JOIN product p ON p.product_id = fii.product_id
-      WHERE (fii.on_hand_qty - fii.reserved_qty) <= $1
-      ORDER BY available_qty ASC, fii.last_updated_at DESC
-      LIMIT 5
-      `,
-            [threshold]
+    SELECT
+        m.material_id,
+        m.name AS material_name,
+        ckii.on_hand_qty,
+        ckii.expiry_date,
+        ckii.last_updated_at,
+        cki.inventory_code,
+        (ckii.expiry_date - CURRENT_DATE) AS days_left
+    FROM central_kitchen_inventory_item ckii
+    JOIN central_kitchen_inventory cki 
+        ON cki.inventory_id = ckii.inventory_id
+    JOIN material m 
+        ON m.material_id = ckii.material_id
+    WHERE cki.central_kitchen_id = $1
+      AND ckii.expiry_date IS NOT NULL
+      AND ckii.expiry_date <= CURRENT_DATE + ($2::int)
+    ORDER BY ckii.expiry_date ASC
+    LIMIT 5
+    `,
+            [kitchenId, expiryDays]
         );
 
         return res.json({
@@ -112,8 +113,8 @@ async function Cdashboard(req, res) {
                 cards,
                 pending_orders: pendingRs.rows,
                 recent_orders: recentRs.rows,
-                low_stock_alerts: lowStockRs.rows,
-                threshold,
+                expiring_materials: expiringRs.rows,
+                expiry_days: expiryDays,
             },
             message: null,
         });
