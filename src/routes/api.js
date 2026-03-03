@@ -241,54 +241,6 @@ const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralK
  *           minItems: 1
  *           items:
  *             $ref: '#/components/schemas/CreateOrderItem'
- * 
- *       ExpiringMaterialRow:
- *       type: object
- *       properties:
- *         material_id:
- *           type: string
- *           example: "2"
- *         material_name:
- *           type: string
- *           example: "Đậu xanh đã cà vỏ"
- *         on_hand_qty:
- *           type: string
- *           example: "200.000"
- *         expiry_date:
- *           type: string
- *           format: date-time
- *           example: "2026-04-14T17:00:00.000Z"
- *         days_left:
- *           type: integer
- *           example: 43
- *         inventory_code:
- *           type: string
- *           example: "CK-INV-001"
- *         last_updated_at:
- *           type: string
- *           format: date-time
- *           example: "2026-03-02T13:32:22.818Z"
- *
- *     DashboardData:
- *       type: object
- *       properties:
- *         cards:
- *           $ref: '#/components/schemas/DashboardCards'
- *         pending_orders:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/OrderSummary'
- *         recent_orders:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/OrderSummary'
- *         expiring_materials:
- *           type: array
- *           items:
- *             $ref: '#/components/schemas/ExpiringMaterialRow'
- *         expiry_days:
- *           type: integer
- *           example: 60     
  */
 
 
