@@ -14,6 +14,7 @@ const CentralKitChenReportController = require("../controllers/CentralKitChenRep
 const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
+const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
 
 
 
@@ -53,7 +54,7 @@ const franchiseInventoryController = require("../controllers/franchiseInventoryC
  *         fulfilled:
  *           type: integer
  *           example: 1
- *
+ * 
  *     OrderSummary:
  *       type: object
  *       properties:
@@ -86,7 +87,7 @@ const franchiseInventoryController = require("../controllers/franchiseInventoryC
  *           type: string
  *           nullable: true
  *           example: "Franchise Store - District 1"
- *
+ * 
  *     OrderListItem:
  *       type: object
  *       properties:
@@ -123,7 +124,7 @@ const franchiseInventoryController = require("../controllers/franchiseInventoryC
  *           type: string
  *           nullable: true
  *           example: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
- *
+ * 
  *     OrderItemDetail:
  *       type: object
  *       properties:
@@ -139,7 +140,7 @@ const franchiseInventoryController = require("../controllers/franchiseInventoryC
  *         unit_price:
  *           type: number
  *           example: 50000
- *
+ * 
  *     OrderDetail:
  *       type: object
  *       properties:
@@ -183,15 +184,13 @@ const franchiseInventoryController = require("../controllers/franchiseInventoryC
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/OrderSummary'
- *
- *     DashboardResponse:
- *       allOf:
- *         - $ref: '#/components/schemas/BaseResponse'
- *         - type: object
- *           properties:
- *             data:
- *               $ref: '#/components/schemas/DashboardData'
- *
+ *         expiring_materials:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/ExpiringMaterialRow'
+ *         expiry_days:
+ *           type: integer
+ *           example: 60
  *     OrderListResponse:
  *       allOf:
  *         - $ref: '#/components/schemas/BaseResponse'
@@ -209,6 +208,7 @@ const franchiseInventoryController = require("../controllers/franchiseInventoryC
  *           properties:
  *             data:
  *               $ref: '#/components/schemas/OrderDetail'
+ * 
  *     CreateOrderItem:
  *       type: object
  *       required:
@@ -241,6 +241,54 @@ const franchiseInventoryController = require("../controllers/franchiseInventoryC
  *           minItems: 1
  *           items:
  *             $ref: '#/components/schemas/CreateOrderItem'
+ * 
+ *       ExpiringMaterialRow:
+ *       type: object
+ *       properties:
+ *         material_id:
+ *           type: string
+ *           example: "2"
+ *         material_name:
+ *           type: string
+ *           example: "Đậu xanh đã cà vỏ"
+ *         on_hand_qty:
+ *           type: string
+ *           example: "200.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-04-14T17:00:00.000Z"
+ *         days_left:
+ *           type: integer
+ *           example: 43
+ *         inventory_code:
+ *           type: string
+ *           example: "CK-INV-001"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-03-02T13:32:22.818Z"
+ *
+ *     DashboardData:
+ *       type: object
+ *       properties:
+ *         cards:
+ *           $ref: '#/components/schemas/DashboardCards'
+ *         pending_orders:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/OrderSummary'
+ *         recent_orders:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/OrderSummary'
+ *         expiring_materials:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/ExpiringMaterialRow'
+ *         expiry_days:
+ *           type: integer
+ *           example: 60     
  */
 
 
@@ -1281,6 +1329,163 @@ router.post("/franchise/inventory/items/:inventoryItemId/adjust", requireAuth, r
  */
 router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff, franchiseInventoryController.seedInventoryItem);
 
-
+/**
+ * @swagger
+ * /api/central-kitchen/materials-inventory:
+ *   get:
+ *     tags:
+ *       - Central Kitchen
+ *     summary: Get materials inventory + expiring materials (Central Kitchen Staff)
+ *     description: |
+ *       Trả về danh sách tồn kho nguyên liệu (inventory_items) và danh sách nguyên liệu sắp hết hạn (expiring_materials).
+ *       Lọc sắp hết hạn theo tham số expiry_days (expiry_date <= today + expiry_days).
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: expiry_days
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 60
+ *           default: 60
+ *           minimum: 0
+ *         description: Số ngày để lọc nguyên liệu sắp hết hạn
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 50
+ *           default: 50
+ *           minimum: 1
+ *         description: Giới hạn số dòng trả về trong inventory_items
+ *       - in: query
+ *         name: expiring_limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 8
+ *           default: 8
+ *           minimum: 1
+ *         description: Giới hạn số dòng trả về trong expiring_materials
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách tồn kho và nguyên liệu sắp hết hạn thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     expiry_days:
+ *                       type: integer
+ *                       example: 60
+ *                     expiring_count:
+ *                       type: integer
+ *                       example: 3
+ *                     expiring_materials:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/CkExpiringMaterialRow'
+ *                     inventory_items:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/CkInventoryMaterialRow'
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *             example:
+ *               success: true
+ *               data:
+ *                 expiry_days: 60
+ *                 expiring_count: 3
+ *                 expiring_materials:
+ *                   - material_id: "2"
+ *                     material_name: "Đậu xanh đã cà vỏ"
+ *                     uom: "kg"
+ *                     on_hand_qty: "200.000"
+ *                     expiry_date: "2026-04-14T17:00:00.000Z"
+ *                     days_left: 43
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                   - material_id: "10"
+ *                     material_name: "Trứng muối"
+ *                     uom: "quả"
+ *                     on_hand_qty: "300.000"
+ *                     expiry_date: "2026-04-14T17:00:00.000Z"
+ *                     days_left: 43
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                   - material_id: "3"
+ *                     material_name: "Hạt sen"
+ *                     uom: "kg"
+ *                     on_hand_qty: "150.000"
+ *                     expiry_date: "2026-04-29T17:00:00.000Z"
+ *                     days_left: 58
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                 inventory_items:
+ *                   - inventory_item_id: "2"
+ *                     material_id: "2"
+ *                     material_name: "Đậu xanh đã cà vỏ"
+ *                     uom: "kg"
+ *                     on_hand_qty: "200.000"
+ *                     expiry_date: "2026-04-14T17:00:00.000Z"
+ *                     days_left: 43
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                   - inventory_item_id: "10"
+ *                     material_id: "10"
+ *                     material_name: "Trứng muối"
+ *                     uom: "quả"
+ *                     on_hand_qty: "300.000"
+ *                     expiry_date: "2026-04-14T17:00:00.000Z"
+ *                     days_left: 43
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *               message: null
+ *       401:
+ *         description: Chưa đăng nhập / token không hợp lệ
+ *       403:
+ *         description: Không đúng role kitchen staff hoặc không thuộc central kitchen
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: "Forbidden"
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: "Inventory error"
+ */
+router.get("/central-kitchen/materials-inventory", requireAuth, getCentralKitchenMaterialsInventory);
 
 module.exports = router;
