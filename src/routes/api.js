@@ -875,9 +875,57 @@ router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitche
 /**
  * @swagger
  * /api/profile:
- *   patch:
- *     summary: Cập nhật profile cơ bản (username)
+ *   get:
+ *     summary: Lấy thông tin profile của user hiện tại
+ *     description: |
+ *       Trả về thông tin profile của user đang đăng nhập.
+ *       User được xác định thông qua JWT token.
  *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy profile thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/BaseResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         user_id:
+ *                           type: integer
+ *                           example: 3
+ *                         username:
+ *                           type: string
+ *                           example: "Kitchen Staff 01"
+ *                         email:
+ *                           type: string
+ *                           example: "kitchen1@moon.vn"
+ *                         role:
+ *                           type: string
+ *                           example: "kitchen_staff"
+ *                         franchise_store_id:
+ *                           type: integer
+ *                           nullable: true
+ *                           example: null
+ *                         central_kitchen_id:
+ *                           type: integer
+ *                           nullable: true
+ *                           example: 2
+ *       401:
+ *         description: Unauthorized (không có token hoặc token sai)
+ */
+router.get("/profile", requireAuth, profileController.getProfile);
+/**
+ * @swagger
+ * /api/profile:
+ *   patch:
+ *     summary: Cập nhật thông tin profile
+ *     tags: [Profile]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -886,18 +934,38 @@ router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitche
  *         application/json:
  *           schema:
  *             type: object
- *             required: [username]
+ *             required:
+ *               - username
  *             properties:
  *               username:
  *                 type: string
- *                 example: "Kitchen Staff 01 (updated)"
+ *                 example: "Manager One"
+ *
  *     responses:
  *       200:
- *         description: OK
+ *         description: Cập nhật profile thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 user_id: "2"
+ *                 username: "Manager One"
+ *                 email: "manager1@moon.vn"
+ *                 status: "active"
+ *               message: null
+ *
  *       400:
- *         description: Validation error
+ *         description: Lỗi validation
+ *
  *       401:
- *         description: Unauthorized
+ *         description: Chưa đăng nhập
+ *
+ *       404:
+ *         description: Không tìm thấy user
+ *
+ *       500:
+ *         description: Server error
  */
 router.patch("/profile", requireAuth, profileController.updateProfile);
 
@@ -905,8 +973,8 @@ router.patch("/profile", requireAuth, profileController.updateProfile);
  * @swagger
  * /api/profile/change-password:
  *   patch:
- *     summary: Đổi mật khẩu
- *     tags: [Auth]
+ *     summary: Đổi mật khẩu user
+ *     tags: [Profile]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -915,21 +983,35 @@ router.patch("/profile", requireAuth, profileController.updateProfile);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [current_password, new_password]
+ *             required:
+ *               - current_password
+ *               - new_password
  *             properties:
  *               current_password:
  *                 type: string
  *                 example: "123456"
  *               new_password:
  *                 type: string
- *                 example: "newpass123"
+ *                 example: "newpassword123"
+ *
  *     responses:
  *       200:
- *         description: OK
- *       400:
- *         description: Validation error
+ *         description: Đổi mật khẩu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data: null
+ *               message: "Đổi mật khẩu thành công"
+ *
  *       401:
- *         description: Unauthorized / wrong current password
+ *         description: Sai mật khẩu hoặc chưa đăng nhập
+ *
+ *       400:
+ *         description: Lỗi validation
+ *
+ *       500:
+ *         description: Server error
  */
 router.patch("/profile/change-password", requireAuth, profileController.changePassword);
 
