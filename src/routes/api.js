@@ -15,6 +15,7 @@ const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
+const receiveConfirmController = require("../controllers/receiveConfirmController");
 
 
 
@@ -1592,5 +1593,97 @@ router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff,
  *                   example: "Inventory error"
  */
 router.get("/central-kitchen/materials-inventory", requireAuth, getCentralKitchenMaterialsInventory);
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     ConfirmReceiptRequest:
+ *       type: object
+ *       required:
+ *         - rating
+ *       properties:
+ *         rating:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 5
+ *           example: 5
+ *         comment:
+ *           type: string
+ *           nullable: true
+ *           example: "Hàng giao đúng và đủ"
+ *
+ *     ConfirmReceiptResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               type: object
+ *               properties:
+ *                 order_id:
+ *                   type: integer
+ *                   example: 15
+ *                 order_code:
+ *                   type: string
+ *                   example: "ORD-1770384235884"
+ *                 status:
+ *                   type: string
+ *                   example: "confirmed"
+ *                 received_confirmed_at:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2026-03-05T09:00:00Z"
+ */
+
+/**
+ * @swagger
+ * /api/orders/{orderId}/confirm-receipt:
+ *   post:
+ *     summary: Xác nhận đã nhận hàng
+ *     description: |
+ *       Franchise staff xác nhận đã nhận đơn hàng khi đơn ở trạng thái **fulfilled**.
+ *       Khi xác nhận thành công:
+ *       - status -> confirmed
+ *       - lưu rating và comment
+ *     tags:
+ *       - Franchise Store
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 15
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ConfirmReceiptRequest'
+ *           example:
+ *             rating: 5
+ *             comment: "Hàng giao đủ và đúng chất lượng"
+ *     responses:
+ *       200:
+ *         description: Xác nhận thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ConfirmReceiptResponse'
+ *       400:
+ *         description: Sai trạng thái đơn hàng hoặc dữ liệu không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Không có quyền với đơn hàng này
+ *       404:
+ *         description: Không tìm thấy đơn hàng
+ *       500:
+ *         description: Server error
+ */
+router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseStaff, receiveConfirmController.confirmReceipt);
 
 module.exports = router;
