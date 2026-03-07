@@ -7,8 +7,8 @@ const productController = require("../controllers/productController");
 const orderController = require("../controllers/orderController.js");
 const { Fdashboard } = require("../controllers/franchiseStaff_dashboardController");
 const { Cdashboard } = require("../controllers/CentralKitchen_dashboardController");
-const { createOrder, getOrders } = require("../controllers/orderController.js");
-const CentralKitchen_CreateOrders = require("../controllers/CentralKitchen_CreateOrders");
+const { getOrders } = require("../controllers/orderController.js");
+const CentralKitchen_NewOrder = require("../controllers/CentralKitchen_NewOrder.js");
 const { requireKitchenStaff } = require("../middleware/requireKitchenStaff");
 const CentralKitChenReportController = require("../controllers/CentralKitChenReportController.js");
 const profileController = require("../controllers/profileController.js");
@@ -16,6 +16,9 @@ const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff")
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
+const { startProcessing, readyToDeliver, getOrderDetail } = require("../controllers/CentralKitchenOrderStatusController");
+
+
 
 
 
@@ -613,62 +616,6 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
 
 /**
  * @swagger
- * /api/CreateOrders:
- *   post:
- *     summary: Tạo đơn hàng mới (Franchise Staff)
- *     description: Franchise staff tạo đơn hàng gửi về central kitchen
- *     tags:
- *       - Franchise Store
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/CreateOrderRequest'
- *           example:
- *             desired_date: "2026-02-10T09:00:00Z"
- *             note: "Giao buổi sáng"
- *             items:
- *               - product_id: 1
- *                 qty: 10
- *               - product_id: 2
- *                 qty: 5
- *     responses:
- *       201:
- *         description: Tạo đơn hàng thành công
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         order_id:
- *                           type: string
- *                           example: "10"
- *                         order_code:
- *                           type: string
- *                           example: "ORD-1770384235884"
- *                         status:
- *                           type: string
- *                           example: "pending"
- *       400:
- *         description: Lỗi validate dữ liệu
- *       401:
- *         description: Chưa đăng nhập
- *       403:
- *         description: Không phải franchise staff
- */
-
-router.post("/CreateOrders", requireAuth, createOrder);
-
-/**
- * @swagger
  * /api/ViewOrders: 
  *   get:
  *     summary: Xem danh sách đơn hàng
@@ -759,9 +706,53 @@ router.post("/CreateOrders", requireAuth, createOrder);
  *       500:
  *         description: Server error
  */
-
 router.get("/ViewOrders", requireAuth, getOrders);
 
+/**
+ * @swagger
+ * /api/orders:
+ *   post:
+ *     summary: Franchise staff tạo đơn hàng
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - desired_date
+ *               - items
+ *             properties:
+ *               desired_date:
+ *                 type: string
+ *                 format: date
+ *                 example: 2026-03-10
+ *               note:
+ *                 type: string
+ *                 example: Giao buổi sáng
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     product_id:
+ *                       type: integer
+ *                       example: 1
+ *                     qty:
+ *                       type: integer
+ *                       example: 20
+ *     responses:
+ *       201:
+ *         description: Tạo đơn thành công
+ *       400:
+ *         description: Validation error
+ *       403:
+ *         description: Forbidden
+ */
+router.post("/orders", requireAuth, requireFranchiseStaff, orderController.createOrder);
 
 router.get("/health/db", async (req, res) => {
     try {
@@ -798,7 +789,7 @@ router.get("/health/db", async (req, res) => {
  *       401: { description: Unauthorized }
  *       403: { description: Forbidden }
  */
-router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.listNewOrders);
+router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.listNewOrders);
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}:
@@ -818,7 +809,7 @@ router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, Centr
  *       403: { description: Forbidden }
  *       404: { description: Not Found }
  */
-router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.getNewOrderDetail);
+router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.getNewOrderDetail);
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/approve:
@@ -838,7 +829,7 @@ router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, 
  *       403: { description: Forbidden }
  *       409: { description: Conflict }
  */
-router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.acceptNewOrder);
+router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.acceptNewOrder);
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/reject:
@@ -871,7 +862,7 @@ router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitch
  *       403: { description: Forbidden }
  *       409: { description: Conflict }
  */
-router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.rejectNewOrder);
+router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.rejectNewOrder);
 
 /**
  * @swagger
@@ -1596,6 +1587,33 @@ router.get("/central-kitchen/materials-inventory", requireAuth, getCentralKitche
 
 /**
  * @swagger
+ * /api/orders/delivered:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng đã giao chờ xác nhận
+ *     tags: [Receive Confirm]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách đơn hàng đã giao
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - order_id: 6
+ *                   order_code: ORD-006
+ *                   status: fulfilled
+ *                   delivered_at: 2026-01-05
+ *                   product_name: Bánh Nướng Trà Xanh
+ *                   qty: 20
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/orders/delivered", requireAuth, requireFranchiseStaff, receiveConfirmController.listOrders);
+
+/**
+ * @swagger
  * components:
  *   schemas:
  *     ConfirmReceiptRequest:
@@ -1685,5 +1703,27 @@ router.get("/central-kitchen/materials-inventory", requireAuth, getCentralKitche
  *         description: Server error
  */
 router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseStaff, receiveConfirmController.confirmReceipt);
+
+/**
+ * @swagger
+ * /api/centralKitchen/orders/{orderId}/ready-to-deliver:
+ *   post:
+ *     summary: Đơn hàng đã chuẩn bị xong và sẵn sàng giao
+ *     tags: [Central Kitchen Orders]
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID đơn hàng
+ *     responses:
+ *       200:
+ *         description: Order chuyển sang trạng thái ready_to_deliver
+ *       404:
+ *         description: Order not found
+ */
+router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, readyToDeliver);
+
 
 module.exports = router;
