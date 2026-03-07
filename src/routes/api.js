@@ -16,12 +16,9 @@ const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff")
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
-const {
-    startProcessing,
-    readyToDeliver,
-    getOrderDetail,
-} = require("../controllers/CentralKitchenOrderStatusController");
-
+const { readyToDeliver } = require("../controllers/CentralKitchenOrderStatusController");
+const managerInventoryController = require("../controllers/managerInventoryController");
+const { requireManager } = require("../middleware/requireManager");
 /**
  * @swagger
  * tags:
@@ -1643,5 +1640,161 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  *         description: Order not found
  */
 router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, readyToDeliver);
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     ManagerInventoryCard:
+ *       type: object
+ *       properties:
+ *         total_products:
+ *           type: integer
+ *           example: 8
+ *         low_stock:
+ *           type: integer
+ *           example: 0
+ *         banh_nuong:
+ *           type: integer
+ *           example: 3
+ *         banh_deo:
+ *           type: integer
+ *           example: 3
+ *
+ *     ManagerInventoryItem:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: integer
+ *           example: 1
+ *         product_id:
+ *           type: integer
+ *           example: 2
+ *         product_name:
+ *           type: string
+ *           example: "Bánh Trung Thu - Thập Cẩm 150g"
+ *         product_type_name:
+ *           type: string
+ *           example: "Mooncake"
+ *         cake_style:
+ *           type: string
+ *           nullable: true
+ *           example: "banh_nuong"
+ *         uom:
+ *           type: string
+ *           example: "cái"
+ *         sku:
+ *           type: string
+ *           example: "SKU-MC-NUTS-150"
+ *         on_hand_qty:
+ *           type: string
+ *           example: "500.000"
+ *         min_qty:
+ *           type: string
+ *           example: "200.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date
+ *           nullable: true
+ *           example: "2026-02-15"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-03-07T12:00:00.000Z"
+ *         stock_status:
+ *           type: string
+ *           example: "Đủ"
+ *
+ *     ManagerInventoryOverviewResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               type: object
+ *               properties:
+ *                 cards:
+ *                   $ref: '#/components/schemas/ManagerInventoryCard'
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ManagerInventoryItem'
+ *
+ * tags:
+ *   - name: Manager
+ *     description: Manager APIs
+ */
+/**
+ * @swagger
+ * /api/manager/inventory/overview:
+ *   get:
+ *     summary: Quản lý kho thành phẩm của manager
+ *     description: |
+ *       Trả về dữ liệu tổng quan kho thành phẩm của bếp trung tâm cho manager, gồm:
+ *       - Cards thống kê:
+ *         - Tổng sản phẩm
+ *         - Tồn kho thấp
+ *         - Bánh nướng
+ *         - Bánh dẻo
+ *       - Bảng chi tiết tồn kho:
+ *         - Tên sản phẩm
+ *         - Loại sản phẩm
+ *         - Kiểu bánh
+ *         - Tồn kho hiện tại
+ *         - Tồn kho tối thiểu
+ *         - Hạn sử dụng
+ *         - Tình trạng tồn kho
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy dữ liệu quản lý kho thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ManagerInventoryOverviewResponse'
+ *             example:
+ *               success: true
+ *               data:
+ *                 cards:
+ *                   total_products: 8
+ *                   low_stock: 0
+ *                   banh_nuong: 3
+ *                   banh_deo: 3
+ *                 items:
+ *                   - inventory_item_id: 1
+ *                     product_id: 2
+ *                     product_name: "Bánh Trung Thu - Thập Cẩm 150g"
+ *                     product_type_name: "Mooncake"
+ *                     cake_style: "banh_nuong"
+ *                     uom: "cái"
+ *                     sku: "SKU-MC-NUTS-150"
+ *                     on_hand_qty: "500.000"
+ *                     min_qty: "200.000"
+ *                     expiry_date: "2026-02-15"
+ *                     last_updated_at: "2026-03-07T12:00:00.000Z"
+ *                     stock_status: "Đủ"
+ *                   - inventory_item_id: 2
+ *                     product_id: 1
+ *                     product_name: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                     product_type_name: "Mooncake"
+ *                     cake_style: "banh_deo"
+ *                     uom: "cái"
+ *                     sku: "SKU-MC-MUNG-150"
+ *                     on_hand_qty: "150.000"
+ *                     min_qty: "100.000"
+ *                     expiry_date: "2026-02-10"
+ *                     last_updated_at: "2026-03-07T12:00:00.000Z"
+ *                     stock_status: "Trung Bình"
+ *               message: null
+ *       401:
+ *         description: Chưa đăng nhập hoặc token không hợp lệ
+ *       403:
+ *         description: Không có quyền truy cập (không phải manager)
+ *       500:
+ *         description: Lỗi server
+ */
+router.get("/manager/inventory/overview", requireAuth, requireManager, managerInventoryController.getOverview);
 
 module.exports = router;
