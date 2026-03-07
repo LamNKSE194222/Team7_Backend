@@ -38,7 +38,7 @@ exports.readyToDeliver = async (req, res) => {
             });
         }
 
-        if (order.central_kitchen_id !== kitchenId) {
+        if (Number(order.central_kitchen_id) !== Number(kitchenId)) {
             await client.query("ROLLBACK");
             return res.status(403).json({
                 success: false,
@@ -66,16 +66,16 @@ exports.readyToDeliver = async (req, res) => {
 
         await client.query("COMMIT");
 
-        res.json({
+        return res.json({
             success: true,
-            message: "Order ready to deliver",
+            message: "Order marked as fulfilled",
         });
 
     } catch (err) {
         await client.query("ROLLBACK");
         console.error(err);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Server error",
         });
@@ -83,7 +83,6 @@ exports.readyToDeliver = async (req, res) => {
         client.release();
     }
 };
-
 
 
 exports.delivered = async (req, res) => {

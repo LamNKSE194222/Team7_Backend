@@ -64,7 +64,7 @@ async function confirmReceipt(req, res) {
         }
 
         // đã hoàn tất rồi
-        if (order.status === "fulfilled") {
+        if (order.status === "confirmed") {
             await client.query("ROLLBACK");
             return res.json({
                 success: true,
@@ -77,18 +77,18 @@ async function confirmReceipt(req, res) {
         }
 
         // chỉ confirm khi đã giao tới cửa hàng
-        if (order.status !== "ready_to_deliver") {
+        if (order.status !== "fulfilled") {
             await client.query("ROLLBACK");
             return res.status(400).json({
                 success: false,
-                message: "Chỉ xác nhận khi đơn ở trạng thái ready_to_deliver"
+                message: "Chỉ xác nhận khi đơn ở trạng thái fulfilled"
             });
         }
 
         const updated = await client.query(
             `
             UPDATE orders
-            SET status = 'fulfilled',
+            SET status = 'confirmed',
                 received_confirmed_at = now(),
                 received_confirmed_by_staff_id = $1,
                 received_rating = $2,
@@ -129,10 +129,10 @@ async function listOrders(req, res) {
 
         const whereStatus =
             filter === "delivered"
-                ? "o.status = 'ready_to_deliver'"
+                ? "o.status = 'fulfilled'"
                 : filter === "confirmed"
-                    ? "o.status = 'fulfilled'"
-                    : "o.status IN ('ready_to_deliver','fulfilled')";
+                    ? "o.status = 'confirmed'"
+                    : "o.status IN ('fulfilled','confirmed')";
 
         const sql = `
         SELECT
