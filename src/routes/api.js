@@ -16,11 +16,24 @@ const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff")
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
-const { startProcessing, readyToDeliver, getOrderDetail } = require("../controllers/CentralKitchenOrderStatusController");
+const {
+    startProcessing,
+    readyToDeliver,
+    getOrderDetail,
+} = require("../controllers/CentralKitchenOrderStatusController");
 
-
-
-
+/**
+ * @swagger
+ * tags:
+ *   - name: Auth
+ *     description: Authentication and profile APIs
+ *   - name: Product
+ *     description: Product APIs
+ *   - name: Franchise
+ *     description: Franchise staff APIs
+ *   - name: Central Kitchen
+ *     description: Central Kitchen staff APIs
+ */
 
 /**
  * @swagger
@@ -38,7 +51,13 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *         success:
  *           type: boolean
  *           example: true
+ *         data:
+ *           nullable: true
  *         message:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         error_code:
  *           type: string
  *           nullable: true
  *           example: null
@@ -58,7 +77,7 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *         fulfilled:
  *           type: integer
  *           example: 1
- * 
+ *
  *     OrderSummary:
  *       type: object
  *       properties:
@@ -91,7 +110,7 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *           type: string
  *           nullable: true
  *           example: "Franchise Store - District 1"
- * 
+ *
  *     OrderListItem:
  *       type: object
  *       properties:
@@ -128,7 +147,7 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *           type: string
  *           nullable: true
  *           example: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
- * 
+ *
  *     OrderItemDetail:
  *       type: object
  *       properties:
@@ -144,7 +163,7 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *         unit_price:
  *           type: number
  *           example: 50000
- * 
+ *
  *     OrderDetail:
  *       type: object
  *       properties:
@@ -191,10 +210,11 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *         expiring_materials:
  *           type: array
  *           items:
- *             $ref: '#/components/schemas/ExpiringMaterialRow'
+ *             $ref: '#/components/schemas/CkExpiringMaterialRow'
  *         expiry_days:
  *           type: integer
  *           example: 60
+ *
  *     OrderListResponse:
  *       allOf:
  *         - $ref: '#/components/schemas/BaseResponse'
@@ -212,7 +232,7 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *           properties:
  *             data:
  *               $ref: '#/components/schemas/OrderDetail'
- * 
+ *
  *     CreateOrderItem:
  *       type: object
  *       required:
@@ -245,7 +265,7 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *           minItems: 1
  *           items:
  *             $ref: '#/components/schemas/CreateOrderItem'
- * 
+ *
  *     CkExpiringMaterialRow:
  *       type: object
  *       properties:
@@ -316,8 +336,172 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *           properties:
  *             data:
  *               $ref: '#/components/schemas/DashboardData'
+ *
+ *     Product:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         name:
+ *           type: string
+ *           example: "Mooncake - Mung Bean 150g"
+ *         uom:
+ *           type: string
+ *           example: "piece"
+ *         sku:
+ *           type: string
+ *           example: "SKU-MC-MUNG-150"
+ *         price:
+ *           type: number
+ *           example: 50000
+ *         description:
+ *           type: string
+ *           nullable: true
+ *           example: "Bánh trung thu nhân đậu xanh 150g"
+ *
+ *     ProductListResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Product'
+ *
+ *     StorageItem:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: string
+ *           example: "2"
+ *         product_id:
+ *           type: string
+ *           example: "1"
+ *         product_code:
+ *           type: string
+ *           example: "SKU-MC-MUNG-150"
+ *         product_name:
+ *           type: string
+ *           example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *         category_name:
+ *           type: string
+ *           example: "Mooncake"
+ *         quantity:
+ *           type: string
+ *           description: "available = on_hand_qty - reserved_qty (Postgres numeric thường trả dạng string)"
+ *           example: "70.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date
+ *           nullable: true
+ *           example: null
+ *
+ *     AdjustInventoryItemRequest:
+ *       type: object
+ *       required:
+ *         - delta
+ *       properties:
+ *         delta:
+ *           type: number
+ *           description: "Số lượng điều chỉnh. Dương = cộng thêm, âm = trừ bớt. Không được bằng 0."
+ *           example: -5
+ *
+ *     AdjustInventoryItemResult:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: integer
+ *           example: 2
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         old_qty:
+ *           type: number
+ *           example: 70
+ *         new_qty:
+ *           type: number
+ *           example: 65
+ *         adjusted_by_staff_id:
+ *           type: integer
+ *           example: 10
+ *
+ *     SeedInventoryItemRequest:
+ *       type: object
+ *       required:
+ *         - product_id
+ *         - qty
+ *       properties:
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         qty:
+ *           type: number
+ *           example: 100
+ *
+ *     FranchiseInventoryItemRow:
+ *       type: object
+ *       description: "RETURNING * từ bảng franchise_inventory_item"
+ *       properties:
+ *         inventory_item_id:
+ *           type: integer
+ *           example: 2
+ *         inventory_id:
+ *           type: integer
+ *           example: 1
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         on_hand_qty:
+ *           type: string
+ *           example: "100.000"
+ *         reserved_qty:
+ *           type: string
+ *           example: "0.000"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           example: "2026-02-24T07:15:00.000Z"
+ *
+ *     ConfirmReceiptRequest:
+ *       type: object
+ *       required:
+ *         - rating
+ *       properties:
+ *         rating:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 5
+ *           example: 5
+ *         comment:
+ *           type: string
+ *           nullable: true
+ *           example: "Hàng giao đúng và đủ"
+ *
+ *     ConfirmReceiptResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               type: object
+ *               properties:
+ *                 order_id:
+ *                   type: integer
+ *                   example: 15
+ *                 order_code:
+ *                   type: string
+ *                   example: "ORD-1770384235884"
+ *                 status:
+ *                   type: string
+ *                   example: "confirmed"
+ *                 received_confirmed_at:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2026-03-05T09:00:00Z"
  */
-
 
 /**
  * @swagger
@@ -367,7 +551,6 @@ const { startProcessing, readyToDeliver, getOrderDetail } = require("../controll
  *       401:
  *         description: Invalid credentials
  */
-
 router.post("/auth/login", authController.login);
 
 /**
@@ -420,54 +603,8 @@ router.post("/auth/login", authController.login);
  *       401:
  *         description: Unauthorized (không có token / token sai)
  */
-
 router.get("/auth/me", requireAuth, authController.me);
 router.post("/auth/logout", requireAuth, authController.logout);
-
-/**
- * @swagger
- * tags:
- *   - name: Product
- *     description: Product APIs
- */
-
-/**
- * @swagger
- * components:
- *   schemas:
- *     Product:
- *       type: object
- *       properties:
- *         id:
- *           type: integer
- *           example: 1
- *         name:
- *           type: string
- *           example: "Mooncake - Mung Bean 150g"
- *         uom:
- *           type: string
- *           example: "piece"
- *         sku:
- *           type: string
- *           example: "SKU-MC-MUNG-150"
- *         price:
- *           type: number
- *           example: 50000
- *         description:
- *           type: string
- *           nullable: true
- *           example: "Bánh trung thu nhân đậu xanh 150g"
- *
- *     ProductListResponse:
- *       allOf:
- *         - $ref: '#/components/schemas/BaseResponse'
- *         - type: object
- *           properties:
- *             data:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Product'
- */
 
 /**
  * @swagger
@@ -524,7 +661,7 @@ router.get("/products", requireAuth, productController.list);
  *     summary: Franchise staff dashboard
  *     description: Fetch dashboard data for franchise staff
  *     tags:
- *       - Franchise Store
+ *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -533,16 +670,31 @@ router.get("/products", requireAuth, productController.list);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/DashboardResponse'
- *       401:
- *         description: Unauthorized
+ *               allOf:
+ *                 - $ref: '#/components/schemas/BaseResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         cards:
+ *                           $ref: '#/components/schemas/DashboardCards'
+ *                         pending_orders:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/OrderSummary'
+ *                         recent_orders:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/OrderSummary'
+ *     401:
+ *       description: Unauthorized
  */
-
 router.get("/franchiseStaff_dashboard", requireAuth, Fdashboard);
 
 /**
  * @swagger
-* /api/CentralKitchenStaff_dashborad:
+ * /api/CentralKitchenStaff_dashborad:
  *   get:
  *     tags:
  *       - Central Kitchen
@@ -611,12 +763,11 @@ router.get("/franchiseStaff_dashboard", requireAuth, Fdashboard);
  *       500:
  *         description: Server error
  */
-
 router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
 
 /**
  * @swagger
- * /api/ViewOrders: 
+ * /api/ViewOrders:
  *   get:
  *     summary: Xem danh sách đơn hàng
  *     description: |
@@ -624,7 +775,7 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
  *       - Chỉ franchise staff được phép truy cập
  *       - Có thể lọc theo trạng thái đơn hàng hoặc tìm theo mã đơn
  *     tags:
- *       - Franchise Store
+ *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -652,53 +803,7 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       order_id:
- *                         type: string
- *                         example: "1"
- *                       order_code:
- *                         type: string
- *                         example: "ORD-001"
- *                       status:
- *                         type: string
- *                         example: "pending"
- *                       created_at:
- *                         type: string
- *                         format: date-time
- *                         example: "2026-01-28T13:05:33.480Z"
- *                       desired_date:
- *                         type: string
- *                         format: date-time
- *                         example: "2026-01-31T13:05:33.480Z"
- *                       note:
- *                         type: string
- *                         nullable: true
- *                         example: null
- *                       delivered_at:
- *                         type: string
- *                         format: date-time
- *                         nullable: true
- *                         example: null
- *                       total_items:
- *                         type: string
- *                         example: "2"
- *                       product_names:
- *                         type: string
- *                         nullable: true
- *                         example: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
- *                 message:
- *                   type: string
- *                   nullable: true
- *                   example: null
+ *               $ref: '#/components/schemas/OrderListResponse'
  *       401:
  *         description: Unauthorized - Chưa đăng nhập
  *       403:
@@ -713,7 +818,7 @@ router.get("/ViewOrders", requireAuth, getOrders);
  * /api/orders:
  *   post:
  *     summary: Franchise staff tạo đơn hàng
- *     tags: [Orders]
+ *     tags: [Franchise]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -762,12 +867,6 @@ router.get("/health/db", async (req, res) => {
         res.status(500).json({ ok: false, error: e.message });
     }
 });
-/**
- * @swagger
- * tags:
- *   - name: Central Kitchen
- *     description: Central Kitchen staff APIs
- */
 
 /**
  * @swagger
@@ -780,16 +879,24 @@ router.get("/health/db", async (req, res) => {
  *     parameters:
  *       - in: query
  *         name: page
- *         schema: { type: integer, example: 1 }
+ *         schema:
+ *           type: integer
+ *           example: 1
  *       - in: query
  *         name: limit
- *         schema: { type: integer, example: 10 }
+ *         schema:
+ *           type: integer
+ *           example: 10
  *     responses:
- *       200: { description: OK }
- *       401: { description: Unauthorized }
- *       403: { description: Forbidden }
+ *       200:
+ *         description: OK
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  */
 router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.listNewOrders);
+
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}:
@@ -802,14 +909,21 @@ router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, Centr
  *       - in: path
  *         name: orderId
  *         required: true
- *         schema: { type: integer, example: 1 }
+ *         schema:
+ *           type: integer
+ *           example: 1
  *     responses:
- *       200: { description: OK }
- *       401: { description: Unauthorized }
- *       403: { description: Forbidden }
- *       404: { description: Not Found }
+ *       200:
+ *         description: OK
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not Found
  */
 router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.getNewOrderDetail);
+
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/approve:
@@ -822,14 +936,21 @@ router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, 
  *       - in: path
  *         name: orderId
  *         required: true
- *         schema: { type: integer, example: 1 }
+ *         schema:
+ *           type: integer
+ *           example: 1
  *     responses:
- *       200: { description: OK }
- *       401: { description: Unauthorized }
- *       403: { description: Forbidden }
- *       409: { description: Conflict }
+ *       200:
+ *         description: OK
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       409:
+ *         description: Conflict
  */
 router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.acceptNewOrder);
+
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/reject:
@@ -842,7 +963,9 @@ router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitch
  *       - in: path
  *         name: orderId
  *         required: true
- *         schema: { type: integer, example: 1 }
+ *         schema:
+ *           type: integer
+ *           example: 1
  *     requestBody:
  *       required: true
  *       content:
@@ -856,68 +979,25 @@ router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitch
  *                 minLength: 3
  *                 example: "Không đủ nguyên liệu"
  *     responses:
- *       200: { description: OK }
- *       400: { description: Bad Request }
- *       401: { description: Unauthorized }
- *       403: { description: Forbidden }
- *       409: { description: Conflict }
+ *       200:
+ *         description: OK
+ *       400:
+ *         description: Bad Request
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       409:
+ *         description: Conflict
  */
 router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.rejectNewOrder);
 
 /**
  * @swagger
  * /api/profile:
- *   get:
- *     summary: Lấy thông tin profile của user hiện tại
- *     description: |
- *       Trả về thông tin profile của user đang đăng nhập.
- *       User được xác định thông qua JWT token.
- *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lấy profile thành công
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         user_id:
- *                           type: integer
- *                           example: 3
- *                         username:
- *                           type: string
- *                           example: "Kitchen Staff 01"
- *                         email:
- *                           type: string
- *                           example: "kitchen1@moon.vn"
- *                         role:
- *                           type: string
- *                           example: "kitchen_staff"
- *                         franchise_store_id:
- *                           type: integer
- *                           nullable: true
- *                           example: null
- *                         central_kitchen_id:
- *                           type: integer
- *                           nullable: true
- *                           example: 2
- *       401:
- *         description: Unauthorized (không có token hoặc token sai)
- */
-router.get("/profile", requireAuth, profileController.getProfile);
-/**
- * @swagger
- * /api/profile:
  *   patch:
  *     summary: Cập nhật thông tin profile
- *     tags: [Profile]
+ *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -932,7 +1012,6 @@ router.get("/profile", requireAuth, profileController.getProfile);
  *               username:
  *                 type: string
  *                 example: "Manager One"
- *
  *     responses:
  *       200:
  *         description: Cập nhật profile thành công
@@ -946,16 +1025,12 @@ router.get("/profile", requireAuth, profileController.getProfile);
  *                 email: "manager1@moon.vn"
  *                 status: "active"
  *               message: null
- *
  *       400:
  *         description: Lỗi validation
- *
  *       401:
  *         description: Chưa đăng nhập
- *
  *       404:
  *         description: Không tìm thấy user
- *
  *       500:
  *         description: Server error
  */
@@ -966,7 +1041,7 @@ router.patch("/profile", requireAuth, profileController.updateProfile);
  * /api/profile/change-password:
  *   patch:
  *     summary: Đổi mật khẩu user
- *     tags: [Profile]
+ *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -985,7 +1060,6 @@ router.patch("/profile", requireAuth, profileController.updateProfile);
  *               new_password:
  *                 type: string
  *                 example: "newpassword123"
- *
  *     responses:
  *       200:
  *         description: Đổi mật khẩu thành công
@@ -995,13 +1069,10 @@ router.patch("/profile", requireAuth, profileController.updateProfile);
  *               success: true
  *               data: null
  *               message: "Đổi mật khẩu thành công"
- *
  *       401:
  *         description: Sai mật khẩu hoặc chưa đăng nhập
- *
  *       400:
  *         description: Lỗi validation
- *
  *       500:
  *         description: Server error
  */
@@ -1018,15 +1089,21 @@ router.patch("/profile/change-password", requireAuth, profileController.changePa
  *     parameters:
  *       - in: query
  *         name: pending_limit
- *         schema: { type: integer, example: 5 }
+ *         schema:
+ *           type: integer
+ *           example: 5
  *         description: Số lượng đơn pending trả về
  *       - in: query
  *         name: threshold
- *         schema: { type: number, example: 5 }
+ *         schema:
+ *           type: number
+ *           example: 5
  *         description: Ngưỡng cảnh báo tồn kho (available_qty <= threshold)
  *       - in: query
  *         name: low_stock_limit
- *         schema: { type: integer, example: 5 }
+ *         schema:
+ *           type: integer
+ *           example: 5
  *         description: Số lượng cảnh báo tồn kho trả về
  *     responses:
  *       200:
@@ -1050,11 +1127,17 @@ router.get("/centralKitchen/report/dashboard", requireAuth, requireKitchenStaff,
  *       - in: query
  *         name: from
  *         required: true
- *         schema: { type: string, format: date-time, example: "2026-01-01T00:00:00Z" }
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-01T00:00:00Z"
  *       - in: query
  *         name: to
  *         required: true
- *         schema: { type: string, format: date-time, example: "2026-02-01T00:00:00Z" }
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-02-01T00:00:00Z"
  *     responses:
  *       200:
  *         description: OK
@@ -1069,133 +1152,9 @@ router.get("/centralKitchen/report/summary", requireAuth, requireKitchenStaff, C
 
 /**
  * @swagger
- * components:
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- *
- *   schemas:
- *     BaseResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         data:
- *           nullable: true
- *         message:
- *           type: string
- *           nullable: true
- *           example: null
- *         error_code:
- *           type: string
- *           nullable: true
- *           example: null
- *
- *     StorageItem:
- *       type: object
- *       properties:
- *         inventory_item_id:
- *           type: string
- *           example: "2"
- *         product_id:
- *           type: string
- *           example: "1"
- *         product_code:
- *           type: string
- *           example: "SKU-MC-MUNG-150"
- *         product_name:
- *           type: string
- *           example: "Bánh Trung Thu - Đậu Xanh 150g"
- *         category_name:
- *           type: string
- *           example: "Mooncake"
- *         quantity:
- *           type: string
- *           description: "available = on_hand_qty - reserved_qty (Postgres numeric thường trả dạng string)"
- *           example: "70.000"
- *         expiry_date:
- *           type: string
- *           format: date
- *           nullable: true
- *           example: null
- *
- *     AdjustInventoryItemRequest:
- *       type: object
- *       required: [delta]
- *       properties:
- *         delta:
- *           type: number
- *           description: "Số lượng điều chỉnh. Dương = cộng thêm, âm = trừ bớt. Không được bằng 0."
- *           example: -5
- *
- *     AdjustInventoryItemResult:
- *       type: object
- *       properties:
- *         inventory_item_id:
- *           type: integer
- *           example: 2
- *         product_id:
- *           type: integer
- *           example: 1
- *         old_qty:
- *           type: number
- *           example: 70
- *         new_qty:
- *           type: number
- *           example: 65
- *         adjusted_by_staff_id:
- *           type: integer
- *           example: 10
- *
- *     SeedInventoryItemRequest:
- *       type: object
- *       required: [product_id, qty]
- *       properties:
- *         product_id:
- *           type: integer
- *           example: 1
- *         qty:
- *           type: number
- *           example: 100
- *
- *     FranchiseInventoryItemRow:
- *       type: object
- *       description: "RETURNING * từ bảng franchise_inventory_item"
- *       properties:
- *         inventory_item_id:
- *           type: integer
- *           example: 2
- *         inventory_id:
- *           type: integer
- *           example: 1
- *         product_id:
- *           type: integer
- *           example: 1
- *         on_hand_qty:
- *           type: string
- *           example: "100.000"
- *         reserved_qty:
- *           type: string
- *           example: "0.000"
- *         last_updated_at:
- *           type: string
- *           format: date-time
- *           nullable: true
- *           example: "2026-02-24T07:15:00.000Z"
- *
- * tags:
- *   - name: Franchise Inventory
- *     description: API kho cho franchise staff
- */
-
-/**
- * @swagger
  * /api/franchise/inventory/storage:
  *   get:
- *     tags: [Franchise Inventory]
+ *     tags: [Franchise]
  *     summary: Lấy danh sách tồn kho (storage) của cửa hàng franchise hiện tại
  *     security:
  *       - bearerAuth: []
@@ -1252,7 +1211,7 @@ router.get("/franchise/inventory/storage", requireAuth, requireFranchiseStaff, f
  * @swagger
  * /api/franchise/inventory/items/{inventoryItemId}/adjust:
  *   post:
- *     tags: [Franchise Inventory]
+ *     tags: [Franchise]
  *     summary: Điều chỉnh số lượng on_hand_qty của 1 inventory item (+/-)
  *     security:
  *       - bearerAuth: []
@@ -1353,7 +1312,7 @@ router.post("/franchise/inventory/items/:inventoryItemId/adjust", requireAuth, r
  * @swagger
  * /api/dev/franchise/inventory/seed:
  *   post:
- *     tags: [Franchise Inventory]
+ *     tags: [Franchise]
  *     summary: Seed 1 product vào kho của store hiện tại (insert/update franchise_inventory_item)
  *     description: Insert vào franchise_inventory_item, nếu trùng (inventory_id, product_id) thì update on_hand_qty.
  *     security:
@@ -1590,7 +1549,7 @@ router.get("/central-kitchen/materials-inventory", requireAuth, getCentralKitche
  * /api/orders/delivered:
  *   get:
  *     summary: Lấy danh sách đơn hàng đã giao chờ xác nhận
- *     tags: [Receive Confirm]
+ *     tags: [Franchise]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1614,48 +1573,6 @@ router.get("/orders/delivered", requireAuth, requireFranchiseStaff, receiveConfi
 
 /**
  * @swagger
- * components:
- *   schemas:
- *     ConfirmReceiptRequest:
- *       type: object
- *       required:
- *         - rating
- *       properties:
- *         rating:
- *           type: integer
- *           minimum: 1
- *           maximum: 5
- *           example: 5
- *         comment:
- *           type: string
- *           nullable: true
- *           example: "Hàng giao đúng và đủ"
- *
- *     ConfirmReceiptResponse:
- *       allOf:
- *         - $ref: '#/components/schemas/BaseResponse'
- *         - type: object
- *           properties:
- *             data:
- *               type: object
- *               properties:
- *                 order_id:
- *                   type: integer
- *                   example: 15
- *                 order_code:
- *                   type: string
- *                   example: "ORD-1770384235884"
- *                 status:
- *                   type: string
- *                   example: "confirmed"
- *                 received_confirmed_at:
- *                   type: string
- *                   format: date-time
- *                   example: "2026-03-05T09:00:00Z"
- */
-
-/**
- * @swagger
  * /api/orders/{orderId}/confirm-receipt:
  *   post:
  *     summary: Xác nhận đã nhận hàng
@@ -1665,7 +1582,7 @@ router.get("/orders/delivered", requireAuth, requireFranchiseStaff, receiveConfi
  *       - status -> confirmed
  *       - lưu rating và comment
  *     tags:
- *       - Franchise Store
+ *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1709,7 +1626,7 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  * /api/centralKitchen/orders/{orderId}/ready-to-deliver:
  *   post:
  *     summary: Đơn hàng đã chuẩn bị xong và sẵn sàng giao
- *     tags: [Central Kitchen Orders]
+ *     tags: [Central Kitchen]
  *     security:
  *       - bearerAuth: []
  *     parameters:
