@@ -1710,6 +1710,8 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  *   post:
  *     summary: Đơn hàng đã chuẩn bị xong và sẵn sàng giao
  *     tags: [Central Kitchen Orders]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: orderId
@@ -1724,6 +1726,5 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  *         description: Order not found
  */
 router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, readyToDeliver);
-
 
 module.exports = router;
