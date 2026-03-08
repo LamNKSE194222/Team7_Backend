@@ -11,7 +11,7 @@ function requireRole(...allowedRoles) {
                 message: `Forbidden: requires role ${allowedRoles.join(" or ")}`
             });
         }
-
+        
         next();
     };
 }

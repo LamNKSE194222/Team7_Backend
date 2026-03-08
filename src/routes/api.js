@@ -22,6 +22,8 @@ const {
     getOrderDetail,
 } = require("../controllers/CentralKitchenOrderStatusController");
 
+const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
+
 /**
  * @swagger
  * tags:
@@ -1644,4 +1646,76 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  */
 router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, readyToDeliver);
 
+/**
+ * @swagger
+ * /api/centralKitchen/product-inventory:
+ *   get:
+ *     summary: Lấy danh sách sản phẩm tồn kho của bếp trung tâm
+ *     tags: [Central Kitchen]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách sản phẩm tồn kho của central kitchen
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       inventory_item_id:
+ *                         type: integer
+ *                         example: 2
+ *                       central_kitchen_id:
+ *                         type: integer
+ *                         example: 2
+ *                       product_id:
+ *                         type: integer
+ *                         example: 2
+ *                       sku:
+ *                         type: string
+ *                         example: SKU-MC-NUTS-150
+ *                       product_name:
+ *                         type: string
+ *                         example: Bánh Trung Thu - thập cẩm 150g
+ *                       uom:
+ *                         type: string
+ *                         example: cái
+ *                       price:
+ *                         type: string
+ *                         example: "55000.00"
+ *                       product_type_name:
+ *                         type: string
+ *                         example: Mooncake
+ *                       on_hand_qty:
+ *                         type: string
+ *                         example: "500.000"
+ *                       min_qty:
+ *                         type: string
+ *                         example: "200.000"
+ *                       expiry_date:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2026-02-14T17:00:00.000Z
+ *                       last_updated_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2026-03-07T12:55:09.165Z
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *       403:
+ *         description: Forbidden hoặc không phải kitchen staff
+ *       500:
+ *         description: Load product inventory error
+ */
+router.get("/centralKitchen/product-inventory", requireAuth, getCentralKitchenProductInventory);
 module.exports = router;
