@@ -31,7 +31,6 @@ async function createOrder(req, res) {
         const map = new Map();
 
         for (const it of items) {
-
             const product_id = Number(it.product_id);
             const qty = Number(it.qty);
 
@@ -53,7 +52,6 @@ async function createOrder(req, res) {
         );
 
         client = await pool.connect();
-
         await client.query("BEGIN");
 
         const orderCode = "ORD-" + Date.now();
@@ -73,7 +71,7 @@ async function createOrder(req, res) {
                 note
             )
             VALUES ($1,$2,$3,2,3,'pending',$4,$5)
-            RETURNING order_id,order_code
+            RETURNING order_id, order_code, created_at
             `,
             [
                 orderCode,
@@ -86,12 +84,12 @@ async function createOrder(req, res) {
 
         const order = orderRs.rows[0];
 
-        // lấy product info
+        // lấy product info, thêm name
         const productIds = normalizedItems.map(x => x.product_id);
 
         const productRs = await client.query(
             `
-            SELECT product_id,price,uom
+            SELECT product_id, name, price, uom
             FROM product
             WHERE product_id = ANY($1::int[])
             `,
@@ -102,6 +100,7 @@ async function createOrder(req, res) {
             productRs.rows.map(r => [
                 Number(r.product_id),
                 {
+                    name: r.name,
                     price: Number(r.price),
                     uom: r.uom
                 }
@@ -110,7 +109,6 @@ async function createOrder(req, res) {
 
         // insert order items
         for (const it of normalizedItems) {
-
             const p = productMap.get(it.product_id);
 
             if (!p) {
@@ -139,16 +137,23 @@ async function createOrder(req, res) {
         await autoApproveOrder(order.order_id);
 
         const updated = await pool.query(
-            `SELECT status FROM orders WHERE order_id=$1`,
+            `SELECT status, created_at FROM orders WHERE order_id = $1`,
             [order.order_id]
         );
+
+        const productNames = normalizedItems
+            .map(it => productMap.get(it.product_id)?.name)
+            .filter(Boolean);
 
         return res.status(201).json({
             success: true,
             data: {
                 order_id: order.order_id,
                 order_code: order.order_code,
-                status: updated.rows[0].status
+                status: updated.rows[0].status,
+                created_at: updated.rows[0].created_at,
+                total_products: normalizedItems.length,
+                product_names: productNames
             },
             message: "Tạo đơn thành công"
         });
@@ -168,9 +173,7 @@ async function createOrder(req, res) {
 
         if (client) client.release();
     }
-
 }
-
 
 
 async function getOrders(req, res) {
