@@ -124,37 +124,49 @@ async function confirmReceipt(req, res) {
 async function listOrders(req, res) {
     try {
         const storeId = req.user.franchise_store_id;
-        const filter = String(req.query.filter || "all").toLowerCase();
         const keyword = String(req.query.keyword || "").trim();
 
-        const whereStatus =
-            filter === "delivered"
-                ? "o.status = 'fulfilled'"
-                : filter === "confirmed"
-                    ? "o.status = 'confirmed'"
-                    : "o.status IN ('fulfilled','confirmed')";
-
         const sql = `
-        SELECT
-            o.order_id,
-            o.order_code,
-            o.status,
-            o.created_at,
-            o.delivered_at,
-            o.received_confirmed_at
-        FROM orders o
-        WHERE o.franchise_store_id = $1
-          AND (${whereStatus})
-          AND ($2 = '' OR o.order_code ILIKE '%' || $2 || '%')
-        ORDER BY o.created_at DESC
-        LIMIT 50
+            SELECT
+                o.order_id,
+                o.order_code,
+                o.status,
+                o.created_at,
+                o.delivered_at,
+                o.received_confirmed_at,
+                COUNT(DISTINCT oi.product_id) AS total_products,
+                COALESCE(
+                    STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
+                    ''
+                ) AS product_names
+            FROM orders o
+            LEFT JOIN order_item oi
+                ON oi.order_id = o.order_id
+            LEFT JOIN product p
+                ON p.product_id = oi.product_id
+            WHERE o.franchise_store_id = $1
+              AND o.status = 'fulfilled'
+              AND ($2 = '' OR o.order_code ILIKE '%' || $2 || '%')
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.status,
+                o.created_at,
+                o.delivered_at,
+                o.received_confirmed_at
+            ORDER BY o.created_at DESC
+            LIMIT 50
         `;
 
         const { rows } = await pool.query(sql, [storeId, keyword]);
 
         return res.json({
             success: true,
-            data: rows
+            data: rows.map(row => ({
+                ...row,
+                total_products: Number(row.total_products),
+                product_label: `${Number(row.total_products)} sản phẩm`
+            }))
         });
 
     } catch (err) {

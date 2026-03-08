@@ -211,7 +211,7 @@ async function acceptNewOrder(req, res) {
         const upRs = await client.query(
             `
             UPDATE orders
-            SET status = 'approved'
+            SET status = 'processing'
             WHERE order_id = $1
               AND central_kitchen_id = $2
               AND status = 'pending'

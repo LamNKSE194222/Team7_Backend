@@ -56,11 +56,11 @@ exports.readyToDeliver = async (req, res) => {
 
         await client.query(
             `
-            UPDATE orders
-            SET status = 'fulfilled',
-                fulfilled_at = NOW()
-            WHERE order_id = $1
-            `,
+                UPDATE orders
+                SET status = 'fulfilled',
+                    fulfilled_at = NOW()
+                WHERE order_id = $1
+                `,
             [orderId]
         );
 
