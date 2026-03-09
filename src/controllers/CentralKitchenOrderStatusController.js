@@ -18,7 +18,6 @@ async function getOrder(client, orderId) {
     return rs.rows[0];
 }
 
-
 exports.readyToDeliver = async (req, res) => {
     const { orderId } = req.params;
     const kitchenId = req.user.central_kitchen_id;
@@ -84,7 +83,6 @@ exports.readyToDeliver = async (req, res) => {
     }
 };
 
-
 exports.delivered = async (req, res) => {
     const { orderId } = req.params;
     const kitchenId = req.user.central_kitchen_id;
@@ -143,6 +141,111 @@ exports.delivered = async (req, res) => {
 
         res.status(500).json({
             success: false,
+            message: "Server error",
+        });
+    } finally {
+        client.release();
+    }
+};
+
+exports.getFulfilledOrders = async (req, res) => {
+    const kitchenId = req.user.central_kitchen_id;
+    const client = await pool.connect();
+
+    try {
+        const rs = await client.query(
+            `
+            SELECT
+                o.order_id,
+                o.order_code,
+                o.status,
+                o.fulfilled_at,
+                o.franchise_store_id,
+                oi.product_id,
+                p.name AS product_name,
+                oi.qty,
+                oi.uom,
+                oi.unit_price
+            FROM orders o
+            JOIN order_item oi
+                ON oi.order_id = o.order_id
+            JOIN product p
+                ON p.product_id = oi.product_id
+            WHERE o.central_kitchen_id = $1
+              AND o.status = 'fulfilled'
+            ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC, oi.order_item_id ASC
+            `,
+            [kitchenId]
+        );
+
+        return res.json({
+            success: true,
+            data: rs.rows,
+            message: null,
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            success: false,
+            data: null,
+            message: "Server error",
+        });
+    } finally {
+        client.release();
+    }
+};
+
+exports.getProcessingOrders = async (req, res) => {
+    const kitchenId = req.user.central_kitchen_id;
+    const client = await pool.connect();
+
+    try {
+        const rs = await client.query(
+            `
+            SELECT
+                o.order_id,
+                o.order_code,
+                o.franchise_store_id,
+                fs.name AS store_name,
+                o.central_kitchen_id,
+                o.status,
+                o.created_at,
+                o.desired_date,
+                COUNT(oi.order_item_id) AS total_items,
+                STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names
+            FROM orders o
+            LEFT JOIN franchise_store fs
+                ON fs.franchise_store_id = o.franchise_store_id
+            LEFT JOIN order_item oi
+                ON oi.order_id = o.order_id
+            LEFT JOIN product p
+                ON p.product_id = oi.product_id
+            WHERE o.central_kitchen_id = $1
+              AND o.status = 'processing'
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.franchise_store_id,
+                fs.name,
+                o.central_kitchen_id,
+                o.status,
+                o.created_at,
+                o.desired_date
+            ORDER BY o.created_at DESC, o.order_id DESC
+            `,
+            [kitchenId]
+        );
+
+        return res.json({
+            success: true,
+            data: rs.rows,
+            message: null,
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            success: false,
+            data: null,
             message: "Server error",
         });
     } finally {

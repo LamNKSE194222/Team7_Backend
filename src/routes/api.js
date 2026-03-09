@@ -16,12 +16,7 @@ const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff")
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
-const {
-    startProcessing,
-    readyToDeliver,
-    getOrderDetail,
-} = require("../controllers/CentralKitchenOrderStatusController");
-
+const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../controllers/CentralKitchenOrderStatusController");
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
 
 /**
@@ -114,6 +109,43 @@ const { getCentralKitchenProductInventory } = require("../controllers/centralKit
  *           example: "Franchise Store - District 1"
  *
  *     OrderListItem:
+ *       type: object
+ *       properties:
+ *         order_id:
+ *           type: string
+ *           example: "1"
+ *         order_code:
+ *           type: string
+ *           example: "ORD-001"
+ *         status:
+ *           type: string
+ *           example: "pending"
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-28T13:05:33.480Z"
+ *         desired_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-31T13:05:33.480Z"
+ *         note:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         delivered_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           example: null
+ *         total_items:
+ *           type: string
+ *           example: "2"
+ *         product_names:
+ *           type: string
+ *           nullable: true
+ *           example: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
+ *
+ *     CentralKitchenFulfilledOrderItem:
  *       type: object
  *       properties:
  *         order_id:
@@ -898,6 +930,84 @@ router.get("/health/db", async (req, res) => {
  *         description: Forbidden
  */
 router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.listNewOrders);
+
+/**
+ * @swagger
+ * /api/centralKitchen/orders/processing:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng processing của central kitchen hiện tại
+ *     description: |
+ *       Trả về danh sách các đơn hàng thuộc central kitchen của kitchen staff đang đăng nhập
+ *       và đang ở trạng thái **processing**.
+ *     tags: [Central Kitchen]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách đơn hàng processing
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - order_id: 53
+ *                   order_code: "ORD-1772954758765"
+ *                   franchise_store_id: 1
+ *                   store_name: "Franchise Store - District 1"
+ *                   central_kitchen_id: 2
+ *                   status: "processing"
+ *                   created_at: "2026-03-08T09:00:00.000Z"
+ *                   desired_date: "2026-03-09T00:00:00.000Z"
+ *                   total_items: "1"
+ *                   product_names: "Bánh Trung Thu - Đậu Xanh 150g"
+ *               message: null
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.get("/centralKitchen/orders/processing", requireAuth, requireKitchenStaff, getProcessingOrders);
+
+/**
+ * @swagger
+ * /api/centralKitchen/orders/fulfilled:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng fulfilled của central kitchen hiện tại
+ *     description: |
+ *       Trả về danh sách các đơn hàng thuộc central kitchen của kitchen staff đang đăng nhập
+ *       và đang ở trạng thái **fulfilled**.
+ *     tags: [Central Kitchen]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách đơn hàng fulfilled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CentralKitchenFulfilledOrderItem'
+ *             example:
+ *               success: true
+ *               data:
+ *                 - order_id: 6
+ *                   order_code: "ORD-006"
+ *                   status: "fulfilled"
+ *                   fulfilled_at: "2026-01-05T10:30:00.000Z"
+ *                   franchise_store_id: 2
+ *                   store_name: "Franchise Store - District 1"
+ *                   total_items: "2"
+ *                   product_names: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
+ *               message: null
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.get("/centralKitchen/orders/fulfilled", requireAuth, requireKitchenStaff, getFulfilledOrders);
 
 /**
  * @swagger
@@ -1718,4 +1828,5 @@ router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, req
  *         description: Load product inventory error
  */
 router.get("/centralKitchen/product-inventory", requireAuth, getCentralKitchenProductInventory);
+
 module.exports = router;

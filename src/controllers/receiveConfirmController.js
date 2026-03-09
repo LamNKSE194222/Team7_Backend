@@ -120,7 +120,6 @@ async function confirmReceipt(req, res) {
     }
 }
 
-
 async function listOrders(req, res) {
     try {
         const storeId = req.user.franchise_store_id;

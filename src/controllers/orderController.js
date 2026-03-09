@@ -175,7 +175,6 @@ async function createOrder(req, res) {
     }
 }
 
-
 async function getOrders(req, res) {
 
     try {
@@ -225,7 +224,6 @@ async function getOrders(req, res) {
 
 }
 
-
 async function deductCentralStock(orderId) {
 
     const client = await pool.connect();
@@ -270,6 +268,5 @@ async function deductCentralStock(orderId) {
     }
 
 }
-
 
 module.exports = { createOrder, getOrders, deductCentralStock };
