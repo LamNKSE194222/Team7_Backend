@@ -41,7 +41,7 @@ exports.readyToDeliver = async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(403).json({
                 success: false,
-                message: "You cannot process this order",
+                message: "Bạn không thể xử lý đơn hàng này",
             });
         }
 
@@ -49,7 +49,7 @@ exports.readyToDeliver = async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(400).json({
                 success: false,
-                message: "Order must be processing first",
+                message: "Đơn hàng phải xử lý trước",
             });
         }
 
@@ -67,7 +67,7 @@ exports.readyToDeliver = async (req, res) => {
 
         return res.json({
             success: true,
-            message: "Order marked as fulfilled",
+            message: "Đã xong, sẵn sàng giao hàng",
         });
 
     } catch (err) {
