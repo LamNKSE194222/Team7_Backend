@@ -15,7 +15,7 @@ async function login(req, res) {
             });
         }
 
-        // Lấy user + nếu là franchise staff thì lấy store_id
+        // Lấy user + phân quyền
         const rs = await pool.query(
             `
       SELECT 
@@ -78,6 +78,7 @@ async function login(req, res) {
         } else if (user.central_kitchen_id) {
             role = "kitchen_staff";
         }
+
         const token = jwt.sign(
             {
                 user_id: user.user_id,
@@ -98,7 +99,8 @@ async function login(req, res) {
                 user: {
                     user_id: user.user_id,
                     username: user.username,
-                    email: user.email, role,
+                    email: user.email,
+                    role,
                     status: user.status,
                     franchise_store_id: user.franchise_store_id ?? null,
                     central_kitchen_id: user.central_kitchen_id ?? null,
@@ -150,7 +152,10 @@ async function me(req, res) {
         ck.kitchen_code   AS central_kitchen_code,
         ck.name           AS central_kitchen_name,
         ks.staff_code     AS kitchen_staff_code,
-        ks.status         AS kitchen_staff_status
+        ks.status         AS kitchen_staff_status,
+        
+        m.manager_code,
+        m.is_admin
 
       FROM "user" u
       LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
@@ -158,6 +163,8 @@ async function me(req, res) {
 
       LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
       LEFT JOIN central_kitchen ck ON ck.central_kitchen_id = ks.central_kitchen_id
+      
+      LEFT JOIN manager m ON m.user_id = u.user_id
 
       WHERE u.user_id = $1
       LIMIT 1

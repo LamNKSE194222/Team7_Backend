@@ -30,7 +30,10 @@ const { getCentralKitchenProductInventory } = require("../controllers/centralKit
  *     description: Franchise staff APIs
  *   - name: Central Kitchen
  *     description: Central Kitchen staff APIs
- */
+ */const { requireRole } = require("../middleware/requireRole");
+const { Mdashboard } = require("../controllers/manager_dashboardController");
+const { getManagerStorage } = require("../controllers/manager_inventoryController");
+
 
 /**
  * @swagger
@@ -1828,5 +1831,103 @@ router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, req
  *         description: Load product inventory error
  */
 router.get("/centralKitchen/product-inventory", requireAuth, getCentralKitchenProductInventory);
+
+// ==================== MANAGER ROUTES ====================
+
+/**
+ * @swagger
+ * /api/manager/dashboard:
+ *   get:
+ *     summary: Manager Dashboard
+ *     description: Get dashboard statistics including order stats, stock totals, and material inventory
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard data retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     cards:
+ *                       type: object
+ *                       properties:
+ *                         total_orders_month:
+ *                           type: integer
+ *                           example: 5
+ *                         low_stock_alerts:
+ *                           type: integer
+ *                           example: 0
+ *                         total_product_stock:
+ *                           type: integer
+ *                           example: 650
+ *                         total_material_stock:
+ *                           type: integer
+ *                           example: 1466
+ *                     materials_inventory:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           inventory_item_id:
+ *                             type: string
+ *                             example: "2"
+ *                           material_name:
+ *                             type: string
+ *                             example: "Đậu xanh đã cà vỏ"
+ *                           on_hand_qty:
+ *                             type: string
+ *                             example: "142.200"
+ *                           expiry_date:
+ *                             type: string
+ *                             format: date-time
+ *                             example: "2026-04-14T17:00:00.000Z"
+ *                           uom:
+ *                             type: string
+ *                             example: "kg"
+ *                           material_type:
+ *                             type: string
+ *                             example: "Nhân bánh"
+ *                           status:
+ *                             type: string
+ *                             example: "active"
+ *                     low_stock_alerts:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     threshold:
+ *                       type: integer
+ *                       example: 5
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ */
+router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), Mdashboard);
+
+/**
+ * @swagger
+ * /api/manager/inventory:
+ *   get:
+ *     summary: Manager Inventory Overview (System-wide storage)
+ *     tags: [Manager]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.get("/manager/inventory", requireAuth, requireRole("manager", "admin"), getManagerStorage);
 
 module.exports = router;

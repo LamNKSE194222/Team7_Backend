@@ -54,6 +54,72 @@ async function createOrder(req, res) {
         client = await pool.connect();
         await client.query("BEGIN");
 
+        // 0) inventory_id
+        const invRs = await client.query(
+            `SELECT inventory_id FROM franchise_inventory WHERE franchise_store_id = $1 LIMIT 1`,
+            [req.user.franchise_store_id]
+        );
+
+        if (invRs.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "Store chưa có inventory",
+                error_code: "INVENTORY_NOT_FOUND",
+            });
+        }
+
+        const inventoryId = invRs.rows[0].inventory_id;
+
+        // 1) check + reserve (lock row)
+        for (const it of normalizedItems) {
+            const stockRs = await client.query(
+                `
+        SELECT on_hand_qty, reserved_qty
+        FROM franchise_inventory_item
+        WHERE inventory_id = $1 AND product_id = $2
+        FOR UPDATE
+        `,
+                [inventoryId, it.product_id]
+            );
+
+            if (stockRs.rowCount === 0) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({
+                    success: false,
+                    data: null,
+                    message: `Kho chưa có sản phẩm product_id=${it.product_id}`,
+                    error_code: "NO_STOCK_ROW",
+                });
+            }
+
+            const onHand = Number(stockRs.rows[0].on_hand_qty);
+            const reserved = Number(stockRs.rows[0].reserved_qty);
+            const available = onHand - reserved;
+
+            if (available < it.qty) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({
+                    success: false,
+                    data: null,
+                    message: `Không đủ tồn kho cho product_id=${it.product_id} (available=${available}, need=${it.qty})`,
+                    error_code: "INSUFFICIENT_STOCK",
+                });
+            }
+
+            await client.query(
+                `
+        UPDATE franchise_inventory_item
+        SET reserved_qty = reserved_qty + $1,
+                    last_updated_at = NOW()
+        WHERE inventory_id = $2 AND product_id = $3
+                    `,
+                [it.qty, inventoryId, it.product_id]
+            );
+        }
+
+        // 2) create order
         const orderCode = "ORD-" + Date.now();
 
         // tạo order
@@ -270,3 +336,59 @@ async function deductCentralStock(orderId) {
 }
 
 module.exports = { createOrder, getOrders, deductCentralStock };
+// GET /api/orders/:id
+async function detail(req, res) {
+    try {
+        if (!req.user?.franchise_store_id) {
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Tài khoản này không thuộc franchise_store (không phải franchise_staff)",
+                error_code: "NOT_STORE_STAFF",
+            });
+        }
+
+        const orderId = Number(req.params.id);
+
+        const orderRs = await pool.query(
+            `
+      SELECT order_id, order_code, status, desired_date, created_at, note, delivered_at
+      FROM orders
+      WHERE order_id = $1 AND franchise_store_id = $2
+                `,
+            [orderId, req.user.franchise_store_id]
+        );
+
+        if (orderRs.rowCount === 0) {
+            return res.status(404).json({ success: false, data: null, message: "Order not found" });
+        }
+
+        const itemsRs = await pool.query(
+            `
+      SELECT 
+        oi.order_item_id,
+                oi.product_id,
+                p.name,
+                oi.uom,
+                oi.qty,
+                oi.unit_price
+      FROM order_item oi
+      JOIN product p ON p.product_id = oi.product_id
+      WHERE oi.order_id = $1
+      ORDER BY oi.order_item_id
+                `,
+            [orderId]
+        );
+
+        return res.json({
+            success: true,
+            data: { order: orderRs.rows[0], items: itemsRs.rows },
+            message: null,
+        });
+    } catch (e) {
+        console.error("ORDER DETAIL ERROR:", e);
+        return res.status(500).json({ success: false, data: null, message: "DB error" });
+    }
+}
+
+module.exports = { createOrder, getOrders, detail };
