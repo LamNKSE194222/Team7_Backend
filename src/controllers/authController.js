@@ -2,10 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 
-<<<<<<< HEAD
-=======
 //Login user
->>>>>>> 2908730f5ccfd86b38feed9a459e69bdf9821e49
 async function login(req, res) {
     try {
         const { email, password } = req.body || {};
@@ -18,7 +15,7 @@ async function login(req, res) {
             });
         }
 
-        // Lấy user + nếu là franchise staff thì lấy store_id
+        // Lấy user + phân quyền
         const rs = await pool.query(
             `
       SELECT 
@@ -27,11 +24,6 @@ async function login(req, res) {
         u.email,
         u.password AS password_hash,
         u.status,
-<<<<<<< HEAD
-        fs.franchise_store_id
-      FROM "user" u
-      LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
-=======
         fs.franchise_store_id,
         ks.central_kitchen_id,
         m.manager_code,
@@ -40,7 +32,6 @@ async function login(req, res) {
       LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
       LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
       LEFT JOIN manager m ON m.user_id = u.user_id
->>>>>>> 2908730f5ccfd86b38feed9a459e69bdf9821e49
       WHERE u.email = $1
       `,
             [email]
@@ -77,15 +68,6 @@ async function login(req, res) {
             });
         }
 
-<<<<<<< HEAD
-        // Với Sprint 1: staff store login là chính
-        // franchise_store_id có thể null nếu user không phải franchise_staff
-        const token = jwt.sign(
-            {
-                user_id: user.user_id,
-                role: user.franchise_store_id ? "franchise_staff" : "user",
-                franchise_store_id: user.franchise_store_id ?? null,
-=======
         //phân quyền
         let role = "user";
 
@@ -96,6 +78,7 @@ async function login(req, res) {
         } else if (user.central_kitchen_id) {
             role = "kitchen_staff";
         }
+
         const token = jwt.sign(
             {
                 user_id: user.user_id,
@@ -104,7 +87,6 @@ async function login(req, res) {
                 central_kitchen_id: user.central_kitchen_id ?? null,
                 manager_code: user.manager_code ?? null,
                 is_admin: user.manager_code ? !!user.is_admin : null,
->>>>>>> 2908730f5ccfd86b38feed9a459e69bdf9821e49
             },
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
@@ -117,16 +99,11 @@ async function login(req, res) {
                 user: {
                     user_id: user.user_id,
                     username: user.username,
-<<<<<<< HEAD
                     email: user.email,
-                    status: user.status,
-                    franchise_store_id: user.franchise_store_id ?? null,
-=======
-                    email: user.email, role,
+                    role,
                     status: user.status,
                     franchise_store_id: user.franchise_store_id ?? null,
                     central_kitchen_id: user.central_kitchen_id ?? null,
->>>>>>> 2908730f5ccfd86b38feed9a459e69bdf9821e49
                 },
             },
             message: null,
@@ -143,12 +120,6 @@ async function login(req, res) {
 }
 
 async function me(req, res) {
-<<<<<<< HEAD
-    return res.json({ success: true, data: req.user, message: null });
-}
-
-module.exports = { login, me };
-=======
     try {
         // requireAuth phải gán req.user từ token
         const userId = req.user?.user_id;
@@ -181,7 +152,10 @@ module.exports = { login, me };
         ck.kitchen_code   AS central_kitchen_code,
         ck.name           AS central_kitchen_name,
         ks.staff_code     AS kitchen_staff_code,
-        ks.status         AS kitchen_staff_status
+        ks.status         AS kitchen_staff_status,
+        
+        m.manager_code,
+        m.is_admin
 
       FROM "user" u
       LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
@@ -189,6 +163,8 @@ module.exports = { login, me };
 
       LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
       LEFT JOIN central_kitchen ck ON ck.central_kitchen_id = ks.central_kitchen_id
+      
+      LEFT JOIN manager m ON m.user_id = u.user_id
 
       WHERE u.user_id = $1
       LIMIT 1
@@ -262,4 +238,3 @@ async function logout(req, res) {
 }
 
 module.exports = { login, me, logout };
->>>>>>> 2908730f5ccfd86b38feed9a459e69bdf9821e49

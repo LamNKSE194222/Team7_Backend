@@ -1,43 +1,5 @@
 const pool = require("../config/database");
 
-<<<<<<< HEAD
-function requireStore(req, res) {
-    if (!req.user.franchise_store_id) {
-        res.status(403).json({
-            success: false,
-            data: null,
-            message: "Tài khoản này không thuộc franchise_store (không phải franchise_staff)",
-            error_code: "NOT_STORE_STAFF",
-        });
-        return false;
-    }
-    return true;
-}
-
-// POST /api/orders
-async function create(req, res) {
-    if (!requireStore(req, res)) return;
-
-    const client = await pool.connect();
-    try {
-        const { desired_date, items } = req.body || {};
-        if (!desired_date || !Array.isArray(items) || items.length === 0) {
-            return res.status(400).json({ success: false, data: null, message: "Invalid payload" });
-        }
-
-        await client.query("BEGIN");
-
-        // order_code đơn giản (demo)
-        const orderCode = "ORD-" + Date.now();
-
-        const orderRs = await client.query(
-            `
-      INSERT INTO orders(order_code, franchise_store_id, created_by_staff_id, status, desired_date)
-      VALUES ($1, $2, $3, 'pending', $4)
-      RETURNING order_id, order_code, status, desired_date, created_at
-      `,
-            [orderCode, req.user.franchise_store_id, req.user.user_id, desired_date]
-=======
 // CREATE ORDER (Franchise staff)
 async function createOrder(req, res) {
     let client;
@@ -157,9 +119,9 @@ async function createOrder(req, res) {
                 `
         UPDATE franchise_inventory_item
         SET reserved_qty = reserved_qty + $1,
-            last_updated_at = NOW()
+                    last_updated_at = NOW()
         WHERE inventory_id = $2 AND product_id = $3
-        `,
+                    `,
                 [it.qty, inventoryId, it.product_id]
             );
         }
@@ -168,47 +130,20 @@ async function createOrder(req, res) {
         const orderCode = "ORD-" + Date.now();
         const orderRs = await client.query(
             `
-      INSERT INTO orders (order_code, franchise_store_id, created_by_staff_id, status, desired_date, note)
-      VALUES ($1, $2, $3, 'pending', $4, $5)
+      INSERT INTO orders(order_code, franchise_store_id, created_by_staff_id, status, desired_date, note)
+      VALUES($1, $2, $3, 'pending', $4, $5)
       RETURNING order_id, order_code, status
-      `,
+                    `,
             [orderCode, req.user.franchise_store_id, req.user.user_id, desired_date, note ?? null]
->>>>>>> 2908730f5ccfd86b38feed9a459e69bdf9821e49
         );
 
         const order = orderRs.rows[0];
 
-<<<<<<< HEAD
-        // Insert items
-        for (const it of items) {
-            const productId = Number(it.product_id);
-            const qty = Number(it.qty);
-
-            if (!productId || !qty || qty <= 0) {
-                throw new Error("Invalid item");
-            }
-
-            // lấy giá hiện tại của product làm unit_price (đúng schema của bạn)
-            const priceRs = await client.query(
-                `SELECT price FROM product WHERE product_id=$1`,
-                [productId]
-            );
-            if (priceRs.rowCount === 0) throw new Error("Product not found: " + productId);
-
-            const unitPrice = priceRs.rows[0].price;
-
-            await client.query(
-                `
-        INSERT INTO order_item(order_id, product_id, qty, unit_price)
-        VALUES ($1, $2, $3, $4)
-        `,
-                [order.order_id, productId, qty, unitPrice]
-=======
         // 3) fetch prices + uom once
         const productIds = normalizedItems.map((x) => x.product_id);
 
         const productRs = await client.query(
-            `SELECT product_id, price, uom FROM product WHERE product_id = ANY($1::int[])`,
+            `SELECT product_id, price, uom FROM product WHERE product_id = ANY($1:: int[])`,
             [productIds]
         );
 
@@ -244,105 +179,14 @@ async function createOrder(req, res) {
             }
 
             await client.query(
-                `INSERT INTO order_item (order_id, product_id, qty, unit_price, uom)
-         VALUES ($1, $2, $3, $4, $5)`,
+                `INSERT INTO order_item(order_id, product_id, qty, unit_price, uom)
+         VALUES($1, $2, $3, $4, $5)`,
                 [order.order_id, it.product_id, it.qty, p.price, p.uom]
->>>>>>> 2908730f5ccfd86b38feed9a459e69bdf9821e49
             );
         }
 
         await client.query("COMMIT");
 
-<<<<<<< HEAD
-        return res.status(201).json({ success: true, data: order, message: null });
-    } catch (e) {
-        await client.query("ROLLBACK");
-        console.error("CREATE ORDER ERROR:", e);
-        return res.status(500).json({ success: false, data: null, message: "Create order failed" });
-    } finally {
-        client.release();
-    }
-}
-
-// GET /api/orders?status=pending
-async function list(req, res) {
-    if (!requireStore(req, res)) return;
-
-    try {
-        const status = req.query.status || null;
-
-        const params = [req.user.franchise_store_id];
-        let sql = `
-      SELECT order_id, order_code, status, desired_date, created_at
-      FROM orders
-      WHERE franchise_store_id = $1
-    `;
-
-        if (status) {
-            params.push(status);
-            sql += ` AND status = $2`;
-        }
-
-        sql += ` ORDER BY created_at DESC`;
-
-        const rs = await pool.query(sql, params);
-        return res.json({ success: true, data: rs.rows, message: null });
-    } catch (e) {
-        console.error("LIST ORDER ERROR:", e);
-        return res.status(500).json({ success: false, data: null, message: "DB error" });
-    }
-}
-
-// GET /api/orders/:id
-async function detail(req, res) {
-    if (!requireStore(req, res)) return;
-
-    try {
-        const orderId = Number(req.params.id);
-
-        const orderRs = await pool.query(
-            `
-      SELECT order_id, order_code, status, desired_date, created_at
-      FROM orders
-      WHERE order_id=$1 AND franchise_store_id=$2
-      `,
-            [orderId, req.user.franchise_store_id]
-        );
-
-        if (orderRs.rowCount === 0) {
-            return res.status(404).json({ success: false, data: null, message: "Order not found" });
-        }
-
-        const itemsRs = await pool.query(
-            `
-      SELECT 
-        oi.order_item_id,
-        oi.product_id,
-        p.name,
-        p.uom,
-        oi.qty,
-        oi.unit_price
-      FROM order_item oi
-      JOIN product p ON p.product_id = oi.product_id
-      WHERE oi.order_id = $1
-      ORDER BY oi.order_item_id
-      `,
-            [orderId]
-        );
-
-        return res.json({
-            success: true,
-            data: { order: orderRs.rows[0], items: itemsRs.rows },
-            message: null,
-        });
-    } catch (e) {
-        console.error("ORDER DETAIL ERROR:", e);
-        return res.status(500).json({ success: false, data: null, message: "DB error" });
-    }
-}
-
-module.exports = { create, list, detail };
-=======
         return res.status(201).json({
             success: true,
             data: {
@@ -404,14 +248,14 @@ async function getOrders(req, res) {
             `
       SELECT
         o.order_id,
-        o.order_code,
-        o.status,
-        o.created_at,
-        o.desired_date,
-        o.note,
-        o.delivered_at,
-        COUNT(oi.order_item_id) AS total_items,
-        COALESCE(STRING_AGG(p.name, ', ' ORDER BY p.name), '') AS product_names
+                o.order_code,
+                o.status,
+                o.created_at,
+                o.desired_date,
+                o.note,
+                o.delivered_at,
+                COUNT(oi.order_item_id) AS total_items,
+                COALESCE(STRING_AGG(p.name, ', ' ORDER BY p.name), '') AS product_names
       FROM orders o
       LEFT JOIN order_item oi ON oi.order_id = o.order_id
       LEFT JOIN product p ON p.product_id = oi.product_id
@@ -434,5 +278,59 @@ async function getOrders(req, res) {
     }
 }
 
-module.exports = { createOrder, getOrders };
->>>>>>> 2908730f5ccfd86b38feed9a459e69bdf9821e49
+// GET /api/orders/:id
+async function detail(req, res) {
+    try {
+        if (!req.user?.franchise_store_id) {
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Tài khoản này không thuộc franchise_store (không phải franchise_staff)",
+                error_code: "NOT_STORE_STAFF",
+            });
+        }
+
+        const orderId = Number(req.params.id);
+
+        const orderRs = await pool.query(
+            `
+      SELECT order_id, order_code, status, desired_date, created_at, note, delivered_at
+      FROM orders
+      WHERE order_id = $1 AND franchise_store_id = $2
+                `,
+            [orderId, req.user.franchise_store_id]
+        );
+
+        if (orderRs.rowCount === 0) {
+            return res.status(404).json({ success: false, data: null, message: "Order not found" });
+        }
+
+        const itemsRs = await pool.query(
+            `
+      SELECT 
+        oi.order_item_id,
+                oi.product_id,
+                p.name,
+                oi.uom,
+                oi.qty,
+                oi.unit_price
+      FROM order_item oi
+      JOIN product p ON p.product_id = oi.product_id
+      WHERE oi.order_id = $1
+      ORDER BY oi.order_item_id
+                `,
+            [orderId]
+        );
+
+        return res.json({
+            success: true,
+            data: { order: orderRs.rows[0], items: itemsRs.rows },
+            message: null,
+        });
+    } catch (e) {
+        console.error("ORDER DETAIL ERROR:", e);
+        return res.status(500).json({ success: false, data: null, message: "DB error" });
+    }
+}
+
+module.exports = { createOrder, getOrders, detail };
