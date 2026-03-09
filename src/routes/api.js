@@ -7,16 +7,30 @@ const productController = require("../controllers/productController");
 const orderController = require("../controllers/orderController.js");
 const { Fdashboard } = require("../controllers/franchiseStaff_dashboardController");
 const { Cdashboard } = require("../controllers/CentralKitchen_dashboardController");
-const { createOrder, getOrders } = require("../controllers/orderController.js");
-const CentralKitchen_CreateOrders = require("../controllers/CentralKitchen_CreateOrders");
+const { getOrders } = require("../controllers/orderController.js");
+const CentralKitchen_NewOrder = require("../controllers/CentralKitchen_NewOrder.js");
 const { requireKitchenStaff } = require("../middleware/requireKitchenStaff");
 const CentralKitChenReportController = require("../controllers/CentralKitChenReportController.js");
 const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
+const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
-const centralKitchenOrderStatusController = require("../controllers/centralKitchenOrderStatusController");
-const { requireRole } = require("../middleware/requireRole");
+const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../controllers/CentralKitchenOrderStatusController");
+const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Auth
+ *     description: Authentication and profile APIs
+ *   - name: Product
+ *     description: Product APIs
+ *   - name: Franchise
+ *     description: Franchise staff APIs
+ *   - name: Central Kitchen
+ *     description: Central Kitchen staff APIs
+ */const { requireRole } = require("../middleware/requireRole");
 const { Mdashboard } = require("../controllers/manager_dashboardController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 
@@ -37,7 +51,13 @@ const { getManagerStorage } = require("../controllers/manager_inventoryControlle
  *         success:
  *           type: boolean
  *           example: true
+ *         data:
+ *           nullable: true
  *         message:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         error_code:
  *           type: string
  *           nullable: true
  *           example: null
@@ -92,6 +112,43 @@ const { getManagerStorage } = require("../controllers/manager_inventoryControlle
  *           example: "Franchise Store - District 1"
  *
  *     OrderListItem:
+ *       type: object
+ *       properties:
+ *         order_id:
+ *           type: string
+ *           example: "1"
+ *         order_code:
+ *           type: string
+ *           example: "ORD-001"
+ *         status:
+ *           type: string
+ *           example: "pending"
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-28T13:05:33.480Z"
+ *         desired_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-31T13:05:33.480Z"
+ *         note:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         delivered_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           example: null
+ *         total_items:
+ *           type: string
+ *           example: "2"
+ *         product_names:
+ *           type: string
+ *           nullable: true
+ *           example: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
+ *
+ *     CentralKitchenFulfilledOrderItem:
  *       type: object
  *       properties:
  *         order_id:
@@ -187,14 +244,13 @@ const { getManagerStorage } = require("../controllers/manager_inventoryControlle
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/OrderSummary'
- *
- *     DashboardResponse:
- *       allOf:
- *         - $ref: '#/components/schemas/BaseResponse'
- *         - type: object
- *           properties:
- *             data:
- *               $ref: '#/components/schemas/DashboardData'
+ *         expiring_materials:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/CkExpiringMaterialRow'
+ *         expiry_days:
+ *           type: integer
+ *           example: 60
  *
  *     OrderListResponse:
  *       allOf:
@@ -213,6 +269,7 @@ const { getManagerStorage } = require("../controllers/manager_inventoryControlle
  *           properties:
  *             data:
  *               $ref: '#/components/schemas/OrderDetail'
+ *
  *     CreateOrderItem:
  *       type: object
  *       required:
@@ -245,8 +302,243 @@ const { getManagerStorage } = require("../controllers/manager_inventoryControlle
  *           minItems: 1
  *           items:
  *             $ref: '#/components/schemas/CreateOrderItem'
+ *
+ *     CkExpiringMaterialRow:
+ *       type: object
+ *       properties:
+ *         material_id:
+ *           type: string
+ *           example: "2"
+ *         material_name:
+ *           type: string
+ *           example: "Đậu xanh đã cà vỏ"
+ *         uom:
+ *           type: string
+ *           example: "kg"
+ *         on_hand_qty:
+ *           type: string
+ *           example: "200.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-04-14T17:00:00.000Z"
+ *         days_left:
+ *           type: integer
+ *           example: 43
+ *         inventory_code:
+ *           type: string
+ *           example: "CK-INV-001"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-03-02T13:32:22.818Z"
+ *
+ *     CkInventoryMaterialRow:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: string
+ *           example: "2"
+ *         material_id:
+ *           type: string
+ *           example: "2"
+ *         material_name:
+ *           type: string
+ *           example: "Đậu xanh đã cà vỏ"
+ *         uom:
+ *           type: string
+ *           example: "kg"
+ *         on_hand_qty:
+ *           type: string
+ *           example: "200.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-04-14T17:00:00.000Z"
+ *         days_left:
+ *           type: integer
+ *           example: 43
+ *         inventory_code:
+ *           type: string
+ *           example: "CK-INV-001"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-03-02T13:32:22.818Z"
+ *
+ *     CentralKitchenDashboardResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               $ref: '#/components/schemas/DashboardData'
+ *
+ *     Product:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         name:
+ *           type: string
+ *           example: "Mooncake - Mung Bean 150g"
+ *         uom:
+ *           type: string
+ *           example: "piece"
+ *         sku:
+ *           type: string
+ *           example: "SKU-MC-MUNG-150"
+ *         price:
+ *           type: number
+ *           example: 50000
+ *         description:
+ *           type: string
+ *           nullable: true
+ *           example: "Bánh trung thu nhân đậu xanh 150g"
+ *
+ *     ProductListResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Product'
+ *
+ *     StorageItem:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: string
+ *           example: "2"
+ *         product_id:
+ *           type: string
+ *           example: "1"
+ *         product_code:
+ *           type: string
+ *           example: "SKU-MC-MUNG-150"
+ *         product_name:
+ *           type: string
+ *           example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *         category_name:
+ *           type: string
+ *           example: "Mooncake"
+ *         quantity:
+ *           type: string
+ *           description: "available = on_hand_qty - reserved_qty (Postgres numeric thường trả dạng string)"
+ *           example: "70.000"
+ *         expiry_date:
+ *           type: string
+ *           format: date
+ *           nullable: true
+ *           example: null
+ *
+ *     AdjustInventoryItemRequest:
+ *       type: object
+ *       required:
+ *         - delta
+ *       properties:
+ *         delta:
+ *           type: number
+ *           description: "Số lượng điều chỉnh. Dương = cộng thêm, âm = trừ bớt. Không được bằng 0."
+ *           example: -5
+ *
+ *     AdjustInventoryItemResult:
+ *       type: object
+ *       properties:
+ *         inventory_item_id:
+ *           type: integer
+ *           example: 2
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         old_qty:
+ *           type: number
+ *           example: 70
+ *         new_qty:
+ *           type: number
+ *           example: 65
+ *         adjusted_by_staff_id:
+ *           type: integer
+ *           example: 10
+ *
+ *     SeedInventoryItemRequest:
+ *       type: object
+ *       required:
+ *         - product_id
+ *         - qty
+ *       properties:
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         qty:
+ *           type: number
+ *           example: 100
+ *
+ *     FranchiseInventoryItemRow:
+ *       type: object
+ *       description: "RETURNING * từ bảng franchise_inventory_item"
+ *       properties:
+ *         inventory_item_id:
+ *           type: integer
+ *           example: 2
+ *         inventory_id:
+ *           type: integer
+ *           example: 1
+ *         product_id:
+ *           type: integer
+ *           example: 1
+ *         on_hand_qty:
+ *           type: string
+ *           example: "100.000"
+ *         reserved_qty:
+ *           type: string
+ *           example: "0.000"
+ *         last_updated_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           example: "2026-02-24T07:15:00.000Z"
+ *
+ *     ConfirmReceiptRequest:
+ *       type: object
+ *       required:
+ *         - rating
+ *       properties:
+ *         rating:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 5
+ *           example: 5
+ *         comment:
+ *           type: string
+ *           nullable: true
+ *           example: "Hàng giao đúng và đủ"
+ *
+ *     ConfirmReceiptResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/BaseResponse'
+ *         - type: object
+ *           properties:
+ *             data:
+ *               type: object
+ *               properties:
+ *                 order_id:
+ *                   type: integer
+ *                   example: 15
+ *                 order_code:
+ *                   type: string
+ *                   example: "ORD-1770384235884"
+ *                 status:
+ *                   type: string
+ *                   example: "confirmed"
+ *                 received_confirmed_at:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2026-03-05T09:00:00Z"
  */
-
 
 /**
  * @swagger
@@ -296,7 +588,6 @@ const { getManagerStorage } = require("../controllers/manager_inventoryControlle
  *       401:
  *         description: Invalid credentials
  */
-
 router.post("/auth/login", authController.login);
 
 /**
@@ -349,54 +640,8 @@ router.post("/auth/login", authController.login);
  *       401:
  *         description: Unauthorized (không có token / token sai)
  */
-
 router.get("/auth/me", requireAuth, authController.me);
 router.post("/auth/logout", requireAuth, authController.logout);
-
-/**
- * @swagger
- * tags:
- *   - name: Product
- *     description: Product APIs
- */
-
-/**
- * @swagger
- * components:
- *   schemas:
- *     Product:
- *       type: object
- *       properties:
- *         id:
- *           type: integer
- *           example: 1
- *         name:
- *           type: string
- *           example: "Mooncake - Mung Bean 150g"
- *         uom:
- *           type: string
- *           example: "piece"
- *         sku:
- *           type: string
- *           example: "SKU-MC-MUNG-150"
- *         price:
- *           type: number
- *           example: 50000
- *         description:
- *           type: string
- *           nullable: true
- *           example: "Bánh trung thu nhân đậu xanh 150g"
- *
- *     ProductListResponse:
- *       allOf:
- *         - $ref: '#/components/schemas/BaseResponse'
- *         - type: object
- *           properties:
- *             data:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Product'
- */
 
 /**
  * @swagger
@@ -453,173 +698,12 @@ router.get("/products", requireAuth, productController.list);
  *     summary: Franchise staff dashboard
  *     description: Fetch dashboard data for franchise staff
  *     tags:
- *       - Franchise Store
+ *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Dashboard data
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/DashboardResponse'
- *       401:
- *         description: Unauthorized
- */
-
-router.get("/franchiseStaff_dashboard", requireAuth, Fdashboard);
-
-/**
- * @swagger
- * /api/CentralKitchenStaff_dashborad:
- *   get:
- *     summary: Central kitchen dashboard
- *     description: Get dashboard data for central kitchen staff, including order statistics, pending orders, recent orders and low stock alerts.
- *     tags:
- *       - Central Kitchen
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Dashboard data retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     cards:
- *                       type: object
- *                       properties:
- *                         pending:
- *                           type: integer
- *                           example: 1
- *                         approved:
- *                           type: integer
- *                           example: 1
- *                         processing:
- *                           type: integer
- *                           example: 2
- *                         fulfilled:
- *                           type: integer
- *                           example: 2
- *                     pending_orders:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           order_id:
- *                             type: string
- *                             example: "1"
- *                           order_code:
- *                             type: string
- *                             example: "ORD-001"
- *                           status:
- *                             type: string
- *                             example: "pending"
- *                           desired_date:
- *                             type: string
- *                             format: date-time
- *                             example: "2026-01-31T13:05:33.480Z"
- *                           created_at:
- *                             type: string
- *                             format: date-time
- *                             example: "2026-01-28T13:05:33.480Z"
- *                           franchise_store_id:
- *                             type: string
- *                             example: "1"
- *                           store_name:
- *                             type: string
- *                             example: "Franchise Store - District 1"
- *                           product_count:
- *                             type: integer
- *                             example: 2
- *                     recent_orders:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           order_id:
- *                             type: string
- *                             example: "1"
- *                           order_code:
- *                             type: string
- *                             example: "ORD-001"
- *                           status:
- *                             type: string
- *                             example: "pending"
- *                           created_at:
- *                             type: string
- *                             format: date-time
- *                             example: "2026-01-28T13:05:33.480Z"
- *                           delivered_at:
- *                             type: string
- *                             format: date-time
- *                             nullable: true
- *                             example: null
- *                           desired_date:
- *                             type: string
- *                             format: date-time
- *                             example: "2026-01-31T13:05:33.480Z"
- *                           store_name:
- *                             type: string
- *                             example: "Franchise Store - District 1"
- *                           product_count:
- *                             type: integer
- *                             example: 2
- *                     low_stock_alerts:
- *                       type: array
- *                       description: List of low stock materials
- *                       items:
- *                         type: object
- *                       example: []
- *                     threshold:
- *                       type: integer
- *                       example: 5
- *                 message:
- *                   type: string
- *                   nullable: true
- *                   example: null
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden - Not central kitchen staff
- */
-
-router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
-
-/**
- * @swagger
- * /api/CreateOrders:
- *   post:
- *     summary: Tạo đơn hàng mới (Franchise Staff)
- *     description: Franchise staff tạo đơn hàng gửi về central kitchen
- *     tags:
- *       - Franchise Store
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/CreateOrderRequest'
- *           example:
- *             desired_date: "2026-02-10T09:00:00Z"
- *             note: "Giao buổi sáng"
- *             items:
- *               - product_id: 1
- *                 qty: 10
- *               - product_id: 2
- *                 qty: 5
- *     responses:
- *       201:
- *         description: Tạo đơn hàng thành công
  *         content:
  *           application/json:
  *             schema:
@@ -630,29 +714,97 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
  *                     data:
  *                       type: object
  *                       properties:
- *                         order_id:
- *                           type: string
- *                           example: "10"
- *                         order_code:
- *                           type: string
- *                           example: "ORD-1770384235884"
- *                         status:
- *                           type: string
- *                           example: "pending"
- *       400:
- *         description: Lỗi validate dữ liệu
- *       401:
- *         description: Chưa đăng nhập
- *       403:
- *         description: Không phải franchise staff
+ *                         cards:
+ *                           $ref: '#/components/schemas/DashboardCards'
+ *                         pending_orders:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/OrderSummary'
+ *                         recent_orders:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/OrderSummary'
+ *     401:
+ *       description: Unauthorized
  */
-
-router.post("/CreateOrders", requireAuth, createOrder);
-router.get("/ViewOrders", requireAuth, getOrders);
+router.get("/franchiseStaff_dashboard", requireAuth, Fdashboard);
 
 /**
  * @swagger
- * /api/ViewOrders: 
+ * /api/CentralKitchenStaff_dashborad:
+ *   get:
+ *     tags:
+ *       - Central Kitchen
+ *     summary: Central Kitchen Dashboard
+ *     description: Dashboard cho nhân viên bếp trung tâm (kitchen_staff)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: expiry_days
+ *         schema:
+ *           type: integer
+ *           example: 60
+ *           default: 7
+ *           minimum: 0
+ *         description: Số ngày lọc cảnh báo HSD (expiry_date <= today + expiry_days)
+ *     responses:
+ *       200:
+ *         description: Dashboard data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CentralKitchenDashboardResponse'
+ *             examples:
+ *               example:
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     cards:
+ *                       pending: 10
+ *                       approved: 1
+ *                       processing: 0
+ *                       fulfilled: 4
+ *                     pending_orders:
+ *                       - order_id: "26"
+ *                         order_code: "ORD-1772352962908"
+ *                         status: "pending"
+ *                         desired_date: "2026-03-18T00:00:00.000Z"
+ *                         created_at: "2026-03-01T08:16:02.898Z"
+ *                         franchise_store_id: "1"
+ *                         store_name: "Franchise Store - District 1"
+ *                         product_count: 1
+ *                     recent_orders:
+ *                       - order_id: "27"
+ *                         order_code: "ORD-1772413228972"
+ *                         status: "confirmed"
+ *                         created_at: "2026-03-02T01:00:28.936Z"
+ *                         delivered_at: null
+ *                         desired_date: "2026-03-02T00:00:00.000Z"
+ *                         store_name: "Franchise Store - District 1"
+ *                         product_count: 1
+ *                     expiring_materials:
+ *                       - material_id: "2"
+ *                         material_name: "Đậu xanh đã cà vỏ"
+ *                         on_hand_qty: "200.000"
+ *                         expiry_date: "2026-04-14T17:00:00.000Z"
+ *                         last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                         inventory_code: "CK-INV-001"
+ *                         days_left: 43
+ *                     expiry_days: 60
+ *                   message: null
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
+
+/**
+ * @swagger
+ * /api/ViewOrders:
  *   get:
  *     summary: Xem danh sách đơn hàng
  *     description: |
@@ -660,7 +812,7 @@ router.get("/ViewOrders", requireAuth, getOrders);
  *       - Chỉ franchise staff được phép truy cập
  *       - Có thể lọc theo trạng thái đơn hàng hoặc tìm theo mã đơn
  *     tags:
- *       - Franchise Store
+ *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -688,53 +840,7 @@ router.get("/ViewOrders", requireAuth, getOrders);
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       order_id:
- *                         type: string
- *                         example: "1"
- *                       order_code:
- *                         type: string
- *                         example: "ORD-001"
- *                       status:
- *                         type: string
- *                         example: "pending"
- *                       created_at:
- *                         type: string
- *                         format: date-time
- *                         example: "2026-01-28T13:05:33.480Z"
- *                       desired_date:
- *                         type: string
- *                         format: date-time
- *                         example: "2026-01-31T13:05:33.480Z"
- *                       note:
- *                         type: string
- *                         nullable: true
- *                         example: null
- *                       delivered_at:
- *                         type: string
- *                         format: date-time
- *                         nullable: true
- *                         example: null
- *                       total_items:
- *                         type: string
- *                         example: "2"
- *                       product_names:
- *                         type: string
- *                         nullable: true
- *                         example: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
- *                 message:
- *                   type: string
- *                   nullable: true
- *                   example: null
+ *               $ref: '#/components/schemas/OrderListResponse'
  *       401:
  *         description: Unauthorized - Chưa đăng nhập
  *       403:
@@ -742,10 +848,53 @@ router.get("/ViewOrders", requireAuth, getOrders);
  *       500:
  *         description: Server error
  */
+router.get("/ViewOrders", requireAuth, getOrders);
 
-
-router.get("/ViewOrders", requireAuth, orderController.getOrders);
-
+/**
+ * @swagger
+ * /api/orders:
+ *   post:
+ *     summary: Franchise staff tạo đơn hàng
+ *     tags: [Franchise]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - desired_date
+ *               - items
+ *             properties:
+ *               desired_date:
+ *                 type: string
+ *                 format: date
+ *                 example: 2026-03-10
+ *               note:
+ *                 type: string
+ *                 example: Giao buổi sáng
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     product_id:
+ *                       type: integer
+ *                       example: 1
+ *                     qty:
+ *                       type: integer
+ *                       example: 20
+ *     responses:
+ *       201:
+ *         description: Tạo đơn thành công
+ *       400:
+ *         description: Validation error
+ *       403:
+ *         description: Forbidden
+ */
+router.post("/orders", requireAuth, requireFranchiseStaff, orderController.createOrder);
 
 router.get("/health/db", async (req, res) => {
     try {
@@ -755,12 +904,6 @@ router.get("/health/db", async (req, res) => {
         res.status(500).json({ ok: false, error: e.message });
     }
 });
-/**
- * @swagger
- * tags:
- *   - name: Central Kitchen
- *     description: Central Kitchen staff APIs
- */
 
 /**
  * @swagger
@@ -773,41 +916,101 @@ router.get("/health/db", async (req, res) => {
  *     parameters:
  *       - in: query
  *         name: page
- *         schema: { type: integer, example: 1 }
+ *         schema:
+ *           type: integer
+ *           example: 1
  *       - in: query
  *         name: limit
- *         schema: { type: integer, example: 10 }
- *     responses:
- *       200: { description: OK }
- *       401: { description: Unauthorized }
- *       403: { description: Forbidden }
- */
-router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.listNewOrders);
-
-/**
- * @swagger
- * /api/centralKitchen/orders/status:
- *   get:
- *     summary: Central Kitchen - Danh sách đơn theo trạng thái (tab)
- *     tags: [Central Kitchen]
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: query
- *         name: status
- *         required: true
  *         schema:
- *           type: string
- *           enum: [approved, processing, fulfilled]
- *         example: processing
+ *           type: integer
+ *           example: 10
  *     responses:
  *       200:
  *         description: OK
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden (not kitchen staff)
+ *         description: Forbidden
  */
-router.get("/centralKitchen/orders/status", requireAuth, requireKitchenStaff, centralKitchenOrderStatusController.listByStatus);
+router.get("/centralKitchen/orders/new", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.listNewOrders);
+
+/**
+ * @swagger
+ * /api/centralKitchen/orders/processing:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng processing của central kitchen hiện tại
+ *     description: |
+ *       Trả về danh sách các đơn hàng thuộc central kitchen của kitchen staff đang đăng nhập
+ *       và đang ở trạng thái **processing**.
+ *     tags: [Central Kitchen]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách đơn hàng processing
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - order_id: 53
+ *                   order_code: "ORD-1772954758765"
+ *                   franchise_store_id: 1
+ *                   store_name: "Franchise Store - District 1"
+ *                   central_kitchen_id: 2
+ *                   status: "processing"
+ *                   created_at: "2026-03-08T09:00:00.000Z"
+ *                   desired_date: "2026-03-09T00:00:00.000Z"
+ *                   total_items: "1"
+ *                   product_names: "Bánh Trung Thu - Đậu Xanh 150g"
+ *               message: null
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.get("/centralKitchen/orders/processing", requireAuth, requireKitchenStaff, getProcessingOrders);
+
+/**
+ * @swagger
+ * /api/centralKitchen/orders/fulfilled:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng fulfilled của central kitchen hiện tại
+ *     description: |
+ *       Trả về danh sách các đơn hàng thuộc central kitchen của kitchen staff đang đăng nhập
+ *       và đang ở trạng thái **fulfilled**.
+ *     tags: [Central Kitchen]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách đơn hàng fulfilled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CentralKitchenFulfilledOrderItem'
+ *             example:
+ *               success: true
+ *               data:
+ *                 - order_id: 6
+ *                   order_code: "ORD-006"
+ *                   status: "fulfilled"
+ *                   fulfilled_at: "2026-01-05T10:30:00.000Z"
+ *                   franchise_store_id: 2
+ *                   store_name: "Franchise Store - District 1"
+ *                   total_items: "2"
+ *                   product_names: "Mooncake - Mung Bean 150g, Mooncake - Mixed Nuts 150g"
+ *               message: null
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.get("/centralKitchen/orders/fulfilled", requireAuth, requireKitchenStaff, getFulfilledOrders);
 
 /**
  * @swagger
@@ -821,14 +1024,21 @@ router.get("/centralKitchen/orders/status", requireAuth, requireKitchenStaff, ce
  *       - in: path
  *         name: orderId
  *         required: true
- *         schema: { type: integer, example: 1 }
+ *         schema:
+ *           type: integer
+ *           example: 1
  *     responses:
- *       200: { description: OK }
- *       401: { description: Unauthorized }
- *       403: { description: Forbidden }
- *       404: { description: Not Found }
+ *       200:
+ *         description: OK
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not Found
  */
-router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.getNewOrderDetail);
+router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.getNewOrderDetail);
+
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/approve:
@@ -841,14 +1051,21 @@ router.get("/centralKitchen/orders/:orderId", requireAuth, requireKitchenStaff, 
  *       - in: path
  *         name: orderId
  *         required: true
- *         schema: { type: integer, example: 1 }
+ *         schema:
+ *           type: integer
+ *           example: 1
  *     responses:
- *       200: { description: OK }
- *       401: { description: Unauthorized }
- *       403: { description: Forbidden }
- *       409: { description: Conflict }
+ *       200:
+ *         description: OK
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       409:
+ *         description: Conflict
  */
-router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.acceptNewOrder);
+router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.acceptNewOrder);
+
 /**
  * @swagger
  * /api/centralKitchen/orders/{orderId}/reject:
@@ -861,7 +1078,9 @@ router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitch
  *       - in: path
  *         name: orderId
  *         required: true
- *         schema: { type: integer, example: 1 }
+ *         schema:
+ *           type: integer
+ *           example: 1
  *     requestBody:
  *       required: true
  *       content:
@@ -875,13 +1094,104 @@ router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitch
  *                 minLength: 3
  *                 example: "Không đủ nguyên liệu"
  *     responses:
- *       200: { description: OK }
- *       400: { description: Bad Request }
- *       401: { description: Unauthorized }
- *       403: { description: Forbidden }
- *       409: { description: Conflict }
+ *       200:
+ *         description: OK
+ *       400:
+ *         description: Bad Request
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       409:
+ *         description: Conflict
  */
-router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_CreateOrders.rejectNewOrder);
+router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.rejectNewOrder);
+
+/**
+ * @swagger
+ * /api/profile:
+ *   patch:
+ *     summary: Cập nhật thông tin profile
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 example: "Manager One"
+ *     responses:
+ *       200:
+ *         description: Cập nhật profile thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 user_id: "2"
+ *                 username: "Manager One"
+ *                 email: "manager1@moon.vn"
+ *                 status: "active"
+ *               message: null
+ *       400:
+ *         description: Lỗi validation
+ *       401:
+ *         description: Chưa đăng nhập
+ *       404:
+ *         description: Không tìm thấy user
+ *       500:
+ *         description: Server error
+ */
+router.patch("/profile", requireAuth, profileController.updateProfile);
+
+/**
+ * @swagger
+ * /api/profile/change-password:
+ *   patch:
+ *     summary: Đổi mật khẩu user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - current_password
+ *               - new_password
+ *             properties:
+ *               current_password:
+ *                 type: string
+ *                 example: "123456"
+ *               new_password:
+ *                 type: string
+ *                 example: "newpassword123"
+ *     responses:
+ *       200:
+ *         description: Đổi mật khẩu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data: null
+ *               message: "Đổi mật khẩu thành công"
+ *       401:
+ *         description: Sai mật khẩu hoặc chưa đăng nhập
+ *       400:
+ *         description: Lỗi validation
+ *       500:
+ *         description: Server error
+ */
+router.patch("/profile/change-password", requireAuth, profileController.changePassword);
 
 /**
  * @swagger
@@ -894,15 +1204,21 @@ router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitche
  *     parameters:
  *       - in: query
  *         name: pending_limit
- *         schema: { type: integer, example: 5 }
+ *         schema:
+ *           type: integer
+ *           example: 5
  *         description: Số lượng đơn pending trả về
  *       - in: query
  *         name: threshold
- *         schema: { type: number, example: 5 }
+ *         schema:
+ *           type: number
+ *           example: 5
  *         description: Ngưỡng cảnh báo tồn kho (available_qty <= threshold)
  *       - in: query
  *         name: low_stock_limit
- *         schema: { type: integer, example: 5 }
+ *         schema:
+ *           type: integer
+ *           example: 5
  *         description: Số lượng cảnh báo tồn kho trả về
  *     responses:
  *       200:
@@ -926,11 +1242,17 @@ router.get("/centralKitchen/report/dashboard", requireAuth, requireKitchenStaff,
  *       - in: query
  *         name: from
  *         required: true
- *         schema: { type: string, format: date-time, example: "2026-01-01T00:00:00Z" }
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-01-01T00:00:00Z"
  *       - in: query
  *         name: to
  *         required: true
- *         schema: { type: string, format: date-time, example: "2026-02-01T00:00:00Z" }
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *           example: "2026-02-01T00:00:00Z"
  *     responses:
  *       200:
  *         description: OK
@@ -945,133 +1267,9 @@ router.get("/centralKitchen/report/summary", requireAuth, requireKitchenStaff, C
 
 /**
  * @swagger
- * components:
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- *
- *   schemas:
- *     BaseResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: true
- *         data:
- *           nullable: true
- *         message:
- *           type: string
- *           nullable: true
- *           example: null
- *         error_code:
- *           type: string
- *           nullable: true
- *           example: null
- *
- *     StorageItem:
- *       type: object
- *       properties:
- *         inventory_item_id:
- *           type: string
- *           example: "2"
- *         product_id:
- *           type: string
- *           example: "1"
- *         product_code:
- *           type: string
- *           example: "SKU-MC-MUNG-150"
- *         product_name:
- *           type: string
- *           example: "Bánh Trung Thu - Đậu Xanh 150g"
- *         category_name:
- *           type: string
- *           example: "Mooncake"
- *         quantity:
- *           type: string
- *           description: "available = on_hand_qty - reserved_qty (Postgres numeric thường trả dạng string)"
- *           example: "70.000"
- *         expiry_date:
- *           type: string
- *           format: date
- *           nullable: true
- *           example: null
- *
- *     AdjustInventoryItemRequest:
- *       type: object
- *       required: [delta]
- *       properties:
- *         delta:
- *           type: number
- *           description: "Số lượng điều chỉnh. Dương = cộng thêm, âm = trừ bớt. Không được bằng 0."
- *           example: -5
- *
- *     AdjustInventoryItemResult:
- *       type: object
- *       properties:
- *         inventory_item_id:
- *           type: integer
- *           example: 2
- *         product_id:
- *           type: integer
- *           example: 1
- *         old_qty:
- *           type: number
- *           example: 70
- *         new_qty:
- *           type: number
- *           example: 65
- *         adjusted_by_staff_id:
- *           type: integer
- *           example: 10
- *
- *     SeedInventoryItemRequest:
- *       type: object
- *       required: [product_id, qty]
- *       properties:
- *         product_id:
- *           type: integer
- *           example: 1
- *         qty:
- *           type: number
- *           example: 100
- *
- *     FranchiseInventoryItemRow:
- *       type: object
- *       description: "RETURNING * từ bảng franchise_inventory_item"
- *       properties:
- *         inventory_item_id:
- *           type: integer
- *           example: 2
- *         inventory_id:
- *           type: integer
- *           example: 1
- *         product_id:
- *           type: integer
- *           example: 1
- *         on_hand_qty:
- *           type: string
- *           example: "100.000"
- *         reserved_qty:
- *           type: string
- *           example: "0.000"
- *         last_updated_at:
- *           type: string
- *           format: date-time
- *           nullable: true
- *           example: "2026-02-24T07:15:00.000Z"
- *
- * tags:
- *   - name: Franchise Inventory
- *     description: API kho cho franchise staff
- */
-
-/**
- * @swagger
  * /api/franchise/inventory/storage:
  *   get:
- *     tags: [Franchise Inventory]
+ *     tags: [Franchise]
  *     summary: Lấy danh sách tồn kho (storage) của cửa hàng franchise hiện tại
  *     security:
  *       - bearerAuth: []
@@ -1128,7 +1326,7 @@ router.get("/franchise/inventory/storage", requireAuth, requireFranchiseStaff, f
  * @swagger
  * /api/franchise/inventory/items/{inventoryItemId}/adjust:
  *   post:
- *     tags: [Franchise Inventory]
+ *     tags: [Franchise]
  *     summary: Điều chỉnh số lượng on_hand_qty của 1 inventory item (+/-)
  *     security:
  *       - bearerAuth: []
@@ -1229,7 +1427,7 @@ router.post("/franchise/inventory/items/:inventoryItemId/adjust", requireAuth, r
  * @swagger
  * /api/dev/franchise/inventory/seed:
  *   post:
- *     tags: [Franchise Inventory]
+ *     tags: [Franchise]
  *     summary: Seed 1 product vào kho của store hiện tại (insert/update franchise_inventory_item)
  *     description: Insert vào franchise_inventory_item, nếu trùng (inventory_id, product_id) thì update on_hand_qty.
  *     security:
@@ -1304,47 +1502,47 @@ router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff,
 
 /**
  * @swagger
- * /api/orders/{orderId}/confirm-receipt:
- *   post:
- *     summary: Franchise staff xác nhận nhận hàng & gửi đánh giá (fulfilled -> confirmed)
- *     description: |
- *       Franchise staff xác nhận đã nhận hàng cho 1 đơn hàng đã giao (status = fulfilled),
- *       đồng thời gửi đánh giá (rating + comment).
- *       - Chỉ cho phép khi order thuộc franchise_store_id của staff
- *       - Chỉ cho phép khi status = fulfilled
- *       - Thành công sẽ chuyển status -> confirmed
+ * /api/central-kitchen/materials-inventory:
+ *   get:
  *     tags:
- *       - Franchise Store
+ *       - Central Kitchen
+ *     summary: Get materials inventory + expiring materials (Central Kitchen Staff)
+ *     description: |
+ *       Trả về danh sách tồn kho nguyên liệu (inventory_items) và danh sách nguyên liệu sắp hết hạn (expiring_materials).
+ *       Lọc sắp hết hạn theo tham số expiry_days (expiry_date <= today + expiry_days).
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: orderId
- *         required: true
+ *       - in: query
+ *         name: expiry_days
+ *         required: false
  *         schema:
  *           type: integer
- *         example: 4
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [rating]
- *             properties:
- *               rating:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 5
- *                 example: 5
- *               comment:
- *                 type: string
- *                 nullable: true
- *                 maxLength: 1000
- *                 example: "ok"
+ *           example: 60
+ *           default: 60
+ *           minimum: 0
+ *         description: Số ngày để lọc nguyên liệu sắp hết hạn
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 50
+ *           default: 50
+ *           minimum: 1
+ *         description: Giới hạn số dòng trả về trong inventory_items
+ *       - in: query
+ *         name: expiring_limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 8
+ *           default: 8
+ *           minimum: 1
+ *         description: Giới hạn số dòng trả về trong expiring_materials
  *     responses:
  *       200:
- *         description: Confirm thành công (status -> confirmed)
+ *         description: Lấy danh sách tồn kho và nguyên liệu sắp hết hạn thành công
  *         content:
  *           application/json:
  *             schema:
@@ -1353,44 +1551,184 @@ router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff,
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Đã xác nhận nhận hàng"
  *                 data:
  *                   type: object
  *                   properties:
- *                     order_id:
+ *                     expiry_days:
  *                       type: integer
- *                       example: 4
- *                     order_code:
- *                       type: string
- *                       example: "ORD-006"
- *                     status:
- *                       type: string
- *                       example: "confirmed"
- *                     received_confirmed_at:
- *                       type: string
- *                       format: date-time
- *                       example: "2026-02-27T10:20:00.000Z"
- *       400:
- *         description: Validate lỗi hoặc đơn không ở trạng thái fulfilled
+ *                       example: 60
+ *                     expiring_count:
+ *                       type: integer
+ *                       example: 3
+ *                     expiring_materials:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/CkExpiringMaterialRow'
+ *                     inventory_items:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/CkInventoryMaterialRow'
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *             example:
+ *               success: true
+ *               data:
+ *                 expiry_days: 60
+ *                 expiring_count: 3
+ *                 expiring_materials:
+ *                   - material_id: "2"
+ *                     material_name: "Đậu xanh đã cà vỏ"
+ *                     uom: "kg"
+ *                     on_hand_qty: "200.000"
+ *                     expiry_date: "2026-04-14T17:00:00.000Z"
+ *                     days_left: 43
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                   - material_id: "10"
+ *                     material_name: "Trứng muối"
+ *                     uom: "quả"
+ *                     on_hand_qty: "300.000"
+ *                     expiry_date: "2026-04-14T17:00:00.000Z"
+ *                     days_left: 43
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                   - material_id: "3"
+ *                     material_name: "Hạt sen"
+ *                     uom: "kg"
+ *                     on_hand_qty: "150.000"
+ *                     expiry_date: "2026-04-29T17:00:00.000Z"
+ *                     days_left: 58
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                 inventory_items:
+ *                   - inventory_item_id: "2"
+ *                     material_id: "2"
+ *                     material_name: "Đậu xanh đã cà vỏ"
+ *                     uom: "kg"
+ *                     on_hand_qty: "200.000"
+ *                     expiry_date: "2026-04-14T17:00:00.000Z"
+ *                     days_left: 43
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *                   - inventory_item_id: "10"
+ *                     material_id: "10"
+ *                     material_name: "Trứng muối"
+ *                     uom: "quả"
+ *                     on_hand_qty: "300.000"
+ *                     expiry_date: "2026-04-14T17:00:00.000Z"
+ *                     days_left: 43
+ *                     inventory_code: "CK-INV-001"
+ *                     last_updated_at: "2026-03-02T13:32:22.818Z"
+ *               message: null
+ *       401:
+ *         description: Chưa đăng nhập / token không hợp lệ
+ *       403:
+ *         description: Không đúng role kitchen staff hoặc không thuộc central kitchen
  *         content:
  *           application/json:
- *             examples:
- *               invalidRating:
- *                 summary: rating không hợp lệ
- *                 value:
- *                   success: false
- *                   message: "rating phải từ 1 đến 5"
- *               notFulfilled:
- *                 summary: đơn chưa fulfilled
- *                 value:
- *                   success: false
- *                   message: "Chỉ xác nhận khi đơn ở trạng thái fulfilled"
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: "Forbidden"
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: "Inventory error"
+ */
+router.get("/central-kitchen/materials-inventory", requireAuth, getCentralKitchenMaterialsInventory);
+
+/**
+ * @swagger
+ * /api/orders/delivered:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng đã giao chờ xác nhận
+ *     tags: [Franchise]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách đơn hàng đã giao
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - order_id: 6
+ *                   order_code: ORD-006
+ *                   status: fulfilled
+ *                   delivered_at: 2026-01-05
+ *                   product_name: Bánh Nướng Trà Xanh
+ *                   qty: 20
  *       401:
- *         description: Unauthorized (không có token / token sai)
+ *         description: Unauthorized
+ */
+router.get("/orders/delivered", requireAuth, requireFranchiseStaff, receiveConfirmController.listOrders);
+
+/**
+ * @swagger
+ * /api/orders/{orderId}/confirm-receipt:
+ *   post:
+ *     summary: Xác nhận đã nhận hàng
+ *     description: |
+ *       Franchise staff xác nhận đã nhận đơn hàng khi đơn ở trạng thái **fulfilled**.
+ *       Khi xác nhận thành công:
+ *       - status -> confirmed
+ *       - lưu rating và comment
+ *     tags:
+ *       - Franchise
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 15
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ConfirmReceiptRequest'
+ *           example:
+ *             rating: 5
+ *             comment: "Hàng giao đủ và đúng chất lượng"
+ *     responses:
+ *       200:
+ *         description: Xác nhận thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ConfirmReceiptResponse'
+ *       400:
+ *         description: Sai trạng thái đơn hàng hoặc dữ liệu không hợp lệ
+ *       401:
+ *         description: Unauthorized
  *       403:
- *         description: Forbidden (không phải franchise staff / đơn không thuộc store)
+ *         description: Không có quyền với đơn hàng này
  *       404:
  *         description: Không tìm thấy đơn hàng
  *       500:
@@ -1400,47 +1738,38 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
 
 /**
  * @swagger
- * /api/franchise/orders/receive-confirm:
- *   get:
- *     summary: Danh sách đơn cho màn Xác nhận nhận hàng (Tất cả/Đã giao/Đã xác nhận)
- *     description: |
- *       Trả về danh sách đơn của franchise store hiện tại để hiển thị trên màn "Xác nhận nhận hàng".
- *       filter:
- *       - all: (fulfilled + confirmed)
- *       - delivered: fulfilled
- *       - confirmed: confirmed
- *     tags: [Franchise Store]
+ * /api/centralKitchen/orders/{orderId}/ready-to-deliver:
+ *   post:
+ *     summary: Đơn hàng đã chuẩn bị xong và sẵn sàng giao
+ *     tags: [Central Kitchen]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: filter
- *         required: false
- *         schema:
- *           type: string
- *           enum: [all, delivered, confirmed]
- *         example: delivered
- *       - in: query
- *         name: keyword
- *         required: false
- *         schema:
- *           type: string
- *         example: "ORD-00"
- *       - in: query
- *         name: page
- *         required: false
+ *       - in: path
+ *         name: orderId
+ *         required: true
  *         schema:
  *           type: integer
- *         example: 1
- *       - in: query
- *         name: limit
- *         required: false
- *         schema:
- *           type: integer
- *         example: 20
+ *         description: ID đơn hàng
  *     responses:
  *       200:
- *         description: OK
+ *         description: Order chuyển sang trạng thái ready_to_deliver
+ *       404:
+ *         description: Order not found
+ */
+router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, readyToDeliver);
+
+/**
+ * @swagger
+ * /api/centralKitchen/product-inventory:
+ *   get:
+ *     summary: Lấy danh sách sản phẩm tồn kho của bếp trung tâm
+ *     tags: [Central Kitchen]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách sản phẩm tồn kho của central kitchen
  *         content:
  *           application/json:
  *             schema:
@@ -1454,62 +1783,54 @@ router.post("/orders/:orderId/confirm-receipt", requireAuth, requireFranchiseSta
  *                   items:
  *                     type: object
  *                     properties:
- *                       order_id:
+ *                       inventory_item_id:
  *                         type: integer
- *                         example: 4
- *                       order_code:
+ *                         example: 2
+ *                       central_kitchen_id:
+ *                         type: integer
+ *                         example: 2
+ *                       product_id:
+ *                         type: integer
+ *                         example: 2
+ *                       sku:
  *                         type: string
- *                         example: "ORD-006"
- *                       status:
+ *                         example: SKU-MC-NUTS-150
+ *                       product_name:
  *                         type: string
- *                         example: "fulfilled"
- *                       created_at:
+ *                         example: Bánh Trung Thu - thập cẩm 150g
+ *                       uom:
+ *                         type: string
+ *                         example: cái
+ *                       price:
+ *                         type: string
+ *                         example: "55000.00"
+ *                       product_type_name:
+ *                         type: string
+ *                         example: Mooncake
+ *                       on_hand_qty:
+ *                         type: string
+ *                         example: "500.000"
+ *                       min_qty:
+ *                         type: string
+ *                         example: "200.000"
+ *                       expiry_date:
  *                         type: string
  *                         format: date-time
- *                       delivered_at:
+ *                         example: 2026-02-14T17:00:00.000Z
+ *                       last_updated_at:
  *                         type: string
  *                         format: date-time
- *                         nullable: true
- *                       received_confirmed_at:
- *                         type: string
- *                         format: date-time
- *                         nullable: true
- *       401:
- *         description: Unauthorized
+ *                         example: 2026-03-07T12:55:09.165Z
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
  *       403:
- *         description: Forbidden (franchise staff only)
+ *         description: Forbidden hoặc không phải kitchen staff
  *       500:
- *         description: Server error
+ *         description: Load product inventory error
  */
-router.get("/franchise/orders/receive-confirm", requireAuth, requireFranchiseStaff, receiveConfirmController.listOrders);
-
-
-/**
- * @swagger
- * /api/centralKitchen/orders/{orderId}/start-processing:
- *   post:
- *     summary: Central Kitchen - Bắt đầu chuẩn bị (approved -> processing)
- *     tags: [Central Kitchen]
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: orderId
- *         required: true
- *         schema: { type: integer }
- *         example: 4
- *     responses:
- *       200:
- *         description: OK
- *       400:
- *         description: Đơn không ở approved
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       404:
- *         description: Not Found
- */
-router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, requireKitchenStaff, centralKitchenOrderStatusController.readyToDeliver);
+router.get("/centralKitchen/product-inventory", requireAuth, getCentralKitchenProductInventory);
 
 // ==================== MANAGER ROUTES ====================
 

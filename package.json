@@ -2,27 +2,19 @@
   "name": "full_backend_zero",
   "version": "1.0.0",
   "description": "Hoi Dan IT Fullstack backend zero",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest",
+    "dev": "nodemon ./src/server.js",
+    "start": "node ./src/server.js"
+  },
   "keywords": [
     "nodejs",
     "react"
   ],
-  "homepage": "https://github.com/LamNKSE194222/udemy-fullstack-backend-zerp#readme",
-  "bugs": {
-    "url": "https://github.com/LamNKSE194222/udemy-fullstack-backend-zerp/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/LamNKSE194222/udemy-fullstack-backend-zerp.git"
-  },
-  "license": "ISC",
   "author": "JungleTea",
-  "type": "commonjs",
-  "main": "server.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon ./src/server.js",
-    "start": "node ./src/server.js"
-  },
+  "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
@@ -35,6 +27,9 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "jest": "^30.2.0",
+    "nodeman": "^1.1.2",
+    "nodemon": "^2.0.22",
+    "supertest": "^7.2.2"
   }
 }
