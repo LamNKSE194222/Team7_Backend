@@ -63,7 +63,6 @@ async function confirmReceipt(req, res) {
             });
         }
 
-        // đã hoàn tất rồi
         if (order.status === "confirmed") {
             await client.query("ROLLBACK");
             return res.json({
@@ -76,7 +75,6 @@ async function confirmReceipt(req, res) {
             });
         }
 
-        // chỉ confirm khi đã giao tới cửa hàng
         if (order.status !== "fulfilled") {
             await client.query("ROLLBACK");
             return res.status(400).json({
@@ -131,7 +129,8 @@ async function listOrders(req, res) {
                 o.order_code,
                 o.status,
                 o.created_at,
-                o.delivered_at,
+                TO_CHAR(o.delivery_date, 'YYYY-MM-DD') AS delivery_date,
+                o.fulfilled_at,
                 o.received_confirmed_at,
                 COUNT(DISTINCT oi.product_id) AS total_products,
                 COALESCE(
@@ -151,9 +150,10 @@ async function listOrders(req, res) {
                 o.order_code,
                 o.status,
                 o.created_at,
-                o.delivered_at,
+                o.delivery_date,
+                o.fulfilled_at,
                 o.received_confirmed_at
-            ORDER BY o.created_at DESC
+            ORDER BY o.delivery_date DESC NULLS LAST, o.order_id DESC
             LIMIT 50
         `;
 
