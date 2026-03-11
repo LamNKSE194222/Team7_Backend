@@ -67,6 +67,10 @@ async function login(req, res) {
                 error_code: "INVALID_LOGIN",
             });
         }
+        await pool.query(
+            `UPDATE "user" SET last_login_at = NOW() WHERE user_id = $1`,
+            [user.user_id]
+        );
 
         //phân quyền
         let role = "user";
