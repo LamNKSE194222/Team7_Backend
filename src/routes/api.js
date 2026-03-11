@@ -10,7 +10,7 @@ const { Cdashboard } = require("../controllers/CentralKitchen_dashboardControlle
 const { getOrders } = require("../controllers/orderController.js");
 const CentralKitchen_NewOrder = require("../controllers/CentralKitchen_NewOrder.js");
 const { requireKitchenStaff } = require("../middleware/requireKitchenStaff");
-const CentralKitChenReportController = require("../controllers/CentralKitchenReportController.js");
+const CentralKitChenReportController = require("../controllers/CentralKitChenReportController.js");
 const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
@@ -1823,8 +1823,6 @@ router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, req
  *         description: Load product inventory error
  */
 router.get("/centralKitchen/product-inventory", requireAuth, requireKitchenStaff, getCentralKitchenProductInventory);
-
-// ==================== MANAGER ROUTES ====================
 
 /**
  * @swagger
