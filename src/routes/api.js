@@ -18,7 +18,11 @@ const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralK
 const receiveConfirmController = require("../controllers/receiveConfirmController");
 const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../controllers/CentralKitchenOrderStatusController");
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
+<<<<<<< HEAD
+const ManagerProductController = require("../controllers/manager_product_controller.js");
+=======
 const adminUserController = require("../controllers/adminUserController");
+>>>>>>> Backend01
 
 /**
  * @swagger
@@ -1059,15 +1063,6 @@ router.get("/ViewOrders", requireAuth, requireFranchiseStaff, getOrders);
  */
 router.post("/orders", requireAuth, requireFranchiseStaff, orderController.createOrder);
 
-router.get("/health/db", async (req, res) => {
-    try {
-        const r = await pool.query("SELECT NOW() as now");
-        res.json({ ok: true, now: r.rows[0].now });
-    } catch (e) {
-        res.status(500).json({ ok: false, error: e.message });
-    }
-});
-
 /**
  * @swagger
  * /api/centralKitchen/orders/new:
@@ -1994,6 +1989,11 @@ router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, req
  *         description: Load product inventory error
  */
 router.get("/centralKitchen/product-inventory", requireAuth, requireKitchenStaff, getCentralKitchenProductInventory);
+<<<<<<< HEAD
+
+// ==================== MANAGER ROUTES ====================
+=======
+>>>>>>> Backend01
 
 /**
  * @swagger
@@ -2093,6 +2093,234 @@ router.get("/manager/inventory", requireAuth, requireRole("manager", "admin"), g
 
 /**
  * @swagger
+<<<<<<< HEAD
+ * /api/Manager_create_products:
+ *   post:
+ *     summary: Create a new product with materials
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - product_type_id
+ *               - name
+ *               - uom
+ *               - sku
+ *               - price
+ *             properties:
+ *               product_type_id:
+ *                 type: integer
+ *                 example: 1
+ *               name:
+ *                 type: string
+ *                 example: Bánh Trung Thu - Đậu Xanh 150g
+ *               uom:
+ *                 type: string
+ *                 example: cái
+ *               sku:
+ *                 type: string
+ *                 example: SKU-MC-MUNG-150
+ *               price:
+ *                 type: number
+ *                 example: 45000
+ *               description:
+ *                 type: string
+ *                 example: Bánh trung thu nhân đậu xanh truyền thống
+ *               materials:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - material_id
+ *                     - qty_required
+ *                     - uom
+ *                   properties:
+ *                     material_id:
+ *                       type: integer
+ *                       example: 1
+ *                     qty_required:
+ *                       type: number
+ *                       example: 0.05
+ *                     uom:
+ *                       type: string
+ *                       example: kg
+ *                     note:
+ *                       type: string
+ *                       example: Bột mì làm vỏ bánh
+ *     responses:
+ *       201:
+ *         description: Product created successfully
+ *       400:
+ *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.post("/Manager_create_products", requireAuth, requireRole("manager", "admin"), ManagerProductController.createProduct);
+
+/**
+ * @swagger
+ * /api/Manager_view_products:
+ *   get:
+ *     summary: Get all products
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Product list retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.get("/Manager_view_products", requireAuth, requireRole("manager", "admin"), ManagerProductController.getProducts);
+
+/**
+ * @swagger
+ * /api/Manager_view_detail_products/{id}:
+ *   get:
+ *     summary: Get product detail by ID
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Product detail retrieved successfully
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.getProductById);
+
+/**
+ * @swagger
+ * /api/Manager_update_products/{id}:
+ *   put:
+ *     summary: Update product information and materials
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               product_type_id:
+ *                 type: integer
+ *                 example: 1
+ *               name:
+ *                 type: string
+ *                 example: Bánh Trung Thu - Đậu Xanh 150g Updated
+ *               uom:
+ *                 type: string
+ *                 example: cái
+ *               sku:
+ *                 type: string
+ *                 example: SKU-MC-MUNG-150
+ *               price:
+ *                 type: number
+ *                 example: 48000
+ *               description:
+ *                 type: string
+ *                 example: Bánh trung thu đậu xanh đã cập nhật
+ *               is_active:
+ *                 type: boolean
+ *                 example: true
+ *               materials:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - material_id
+ *                     - qty_required
+ *                     - uom
+ *                   properties:
+ *                     material_id:
+ *                       type: integer
+ *                       example: 1
+ *                     qty_required:
+ *                       type: number
+ *                       example: 0.05
+ *                     uom:
+ *                       type: string
+ *                       example: kg
+ *                     note:
+ *                       type: string
+ *                       example: Bột mì cập nhật
+ *     responses:
+ *       200:
+ *         description: Product updated successfully
+ *       400:
+ *         description: Invalid input
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.put("/Manager_update_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.updateProduct);
+
+/**
+ * @swagger
+ * /api/Manager_delete_products/{id}:
+ *   delete:
+ *     summary: Soft delete product (set is_active = false)
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Product deleted successfully
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.delete("/Manager_delete_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.deleteProduct);
+
+/**
+ * @swagger
+ * /api/Manager_restore_products/{id}:
+ *   patch:
+ *     summary: Restore soft-deleted product (set is_active = true)
+ *     tags: [Manager Products]
+=======
  * tags:
  *   - name: Admin
  *     description: Admin user management APIs
@@ -2172,10 +2400,29 @@ router.get("/admin/users", requireAuth, requireRole("admin"), adminUserControlle
  *     summary: Chỉnh sửa thông tin người dùng
  *     description: Admin cập nhật username và email của user
  *     tags: [Admin]
+>>>>>>> Backend01
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
+<<<<<<< HEAD
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Product restored successfully
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.patch("/Manager_restore_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.restoreProduct);
+=======
  *         name: userId
  *         required: true
  *         schema:
@@ -2341,5 +2588,6 @@ router.patch("/admin/users/:userId/reset-password", requireAuth, requireRole("ad
  *         description: Server/DB error
  */
 router.patch("/admin/users/:userId/status", requireAuth, requireRole("admin"), adminUserController.updateUserStatus);
+>>>>>>> Backend01
 
 module.exports = router;

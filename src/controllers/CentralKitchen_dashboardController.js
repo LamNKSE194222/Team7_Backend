@@ -2,20 +2,7 @@ const pool = require("../config/database");
 
 async function Cdashboard(req, res) {
     try {
-        const role = req.user?.role;
-        const allowed = ["kitchen_staff"]; // Central Kitchen staff
-
-        if (!allowed.includes(role)) {
-            return res
-                .status(403)
-                .json({ success: false, data: null, message: "Forbidden" });
-        }
-
-        const kitchenId = req.user?.central_kitchen_id;
-        if (!kitchenId) {
-            return res.status(403).json({ success: false, data: null, message: "Not kitchen staff" });
-        }
-
+        const kitchenId = req.user.central_kitchen_id;
         // 1) Cards: đếm theo status (đơn thuộc bếp trung tâm này)
         const statusRs = await pool.query(
             `
