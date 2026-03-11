@@ -87,6 +87,7 @@ async function confirmReceipt(req, res) {
             `
             UPDATE orders
             SET status = 'confirmed',
+                delivered_at = NOW(),
                 received_confirmed_at = now(),
                 received_confirmed_by_staff_id = $1,
                 received_rating = $2,

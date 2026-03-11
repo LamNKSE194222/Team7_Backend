@@ -122,7 +122,7 @@ exports.delivered = async (req, res) => {
             `
             UPDATE orders
             SET status = 'confirmed',
-                confirmed_at = NOW()
+                delivered_at = NOW()
             WHERE order_id = $1
             `,
             [orderId]
