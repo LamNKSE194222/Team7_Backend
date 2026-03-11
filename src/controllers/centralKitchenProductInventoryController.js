@@ -2,24 +2,7 @@ const pool = require("../config/database");
 
 async function getCentralKitchenProductInventory(req, res) {
     try {
-        const role = req.user?.role;
-        if (role !== "kitchen_staff") {
-            return res.status(403).json({
-                success: false,
-                data: null,
-                message: "Forbidden"
-            });
-        }
-
-        const kitchenId = req.user?.central_kitchen_id;
-        if (!kitchenId) {
-            return res.status(403).json({
-                success: false,
-                data: null,
-                message: "Not kitchen staff"
-            });
-        }
-
+        const kitchenId = req.user.central_kitchen_id;
         const rs = await pool.query(
             `
             SELECT
