@@ -2,19 +2,7 @@ const pool = require("../config/database");
 
 async function Fdashboard(req, res) {
     try {
-        const role = req.user?.role;
-        const allowed = ["franchise_staff"];
-
-        if (!allowed.includes(role)) {
-            return res
-                .status(403)
-                .json({ success: false, data: null, message: "Forbidden" });
-        }
-
         const storeId = req.user.franchise_store_id;
-        if (!storeId) {
-            return res.status(403).json({ success: false, data: null, message: "Not store staff" });
-        }
 
         // Đếm theo status
         const statusRs = await pool.query(

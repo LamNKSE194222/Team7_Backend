@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 
+
 async function createProduct(req, res) {
     const client = await pool.connect();
 
