@@ -26,7 +26,7 @@ async function Fdashboard(req, res) {
         o.order_code,
         o.status,
         o.created_at,
-        0.delivery_date,
+        o.delivery_date,
         o.delivered_at,
         COUNT(oi.order_item_id)::int AS product_count
       FROM orders o
