@@ -805,47 +805,88 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
 
 /**
  * @swagger
- * /api/ViewOrders:
- *   get:
- *     summary: Xem danh sách đơn hàng
+ * /api/orders/{orderId}/confirm-receipt:
+ *   post:
+ *     summary: Xác nhận đã nhận hàng
  *     description: |
- *       Lấy danh sách đơn hàng của franchise store hiện tại.
- *       - Chỉ franchise staff được phép truy cập
- *       - Có thể lọc theo trạng thái đơn hàng hoặc tìm theo mã đơn
+ *       Franchise staff xác nhận đã nhận đơn hàng khi đơn ở trạng thái **fulfilled**.
+ *       
+ *       Khi xác nhận thành công:
+ *       - cập nhật trạng thái đơn hàng thành **confirmed**
+ *       - lưu thời gian xác nhận nhận hàng
+ *       - cộng sản phẩm từ đơn hàng vào kho của franchise store
+ *       - có thể lưu rating và comment
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: status
- *         required: false
- *         description: Lọc theo trạng thái đơn hàng
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         description: ID của đơn hàng cần xác nhận nhận
  *         schema:
- *           type: string
- *           enum:
- *             - pending
- *             - approved
- *             - processing
- *             - fulfilled
- *             - cancelled
- *       - in: query
- *         name: keyword
- *         required: false
- *         description: Tìm kiếm theo mã đơn hàng (order_code)
- *         schema:
- *           type: string
+ *           type: integer
+ *           example: 80
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rating
+ *             properties:
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 5
+ *               comment:
+ *                 type: string
+ *                 maxLength: 1000
+ *                 example: Hàng giao đủ và đúng chất lượng
  *     responses:
  *       200:
- *         description: Lấy danh sách đơn hàng thành công
+ *         description: Xác nhận nhận hàng thành công
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/OrderListResponse'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Đã xác nhận nhận hàng và cộng vào kho franchise
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     order_id:
+ *                       type: string
+ *                       example: "80"
+ *                     order_code:
+ *                       type: string
+ *                       example: "ORD-1773243947686"
+ *                     status:
+ *                       type: string
+ *                       example: "confirmed"
+ *                     received_confirmed_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-03-11T16:03:09.132Z"
+ *                     inventory_updated_count:
+ *                       type: integer
+ *                       example: 1
+ *       400:
+ *         description: Sai trạng thái đơn hàng hoặc dữ liệu không hợp lệ
  *       401:
  *         description: Unauthorized - Chưa đăng nhập
  *       403:
- *         description: Forbidden - Không có quyền xem đơn hàng
+ *         description: Không có quyền với đơn hàng này
+ *       404:
+ *         description: Không tìm thấy đơn hàng
  *       500:
  *         description: Server error
  */
@@ -1313,184 +1354,6 @@ router.get("/centralKitchen/report/summary", requireAuth, requireKitchenStaff, C
  *               error_code: "SERVER_ERROR"
  */
 router.get("/franchise/inventory/storage", requireAuth, requireFranchiseStaff, franchiseInventoryController.getStorage);
-
-/**
- * @swagger
- * /api/franchise/inventory/items/{inventoryItemId}/adjust:
- *   post:
- *     tags: [Franchise]
- *     summary: Điều chỉnh số lượng on_hand_qty của 1 inventory item (+/-)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: inventoryItemId
- *         required: true
- *         schema:
- *           type: integer
- *         example: 2
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AdjustInventoryItemRequest'
- *           example:
- *             delta: -5
- *     responses:
- *       200:
- *         description: Adjust thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/AdjustInventoryItemResult'
- *                 message:
- *                   type: string
- *                   example: "Adjusted"
- *             example:
- *               success: true
- *               data:
- *                 inventory_item_id: 2
- *                 product_id: 1
- *                 old_qty: 70
- *                 new_qty: 65
- *                 adjusted_by_staff_id: 10
- *               message: "Adjusted"
- *       400:
- *         description: Validation error hoặc không đủ tồn để trừ
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *             examples:
- *               invalidInput:
- *                 summary: delta không hợp lệ
- *                 value:
- *                   success: false
- *                   data: null
- *                   message: "delta phải là number và khác 0"
- *                   error_code: "VALIDATION_ERROR"
- *               insufficientStock:
- *                 summary: Không đủ tồn để trừ
- *                 value:
- *                   success: false
- *                   data: null
- *                   message: "Không đủ tồn để trừ"
- *                   error_code: "INSUFFICIENT_STOCK"
- *       404:
- *         description: Inventory item không tồn tại
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *             example:
- *               success: false
- *               data: null
- *               message: "Inventory item không tồn tại"
- *               error_code: "NOT_FOUND"
- *       401:
- *         description: Chưa đăng nhập / token không hợp lệ
- *       403:
- *         description: Không đúng role franchise staff
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *             example:
- *               success: false
- *               data: null
- *               message: "Internal server error"
- *               error_code: "INTERNAL_ERROR"
- */
-router.post("/franchise/inventory/items/:inventoryItemId/adjust", requireAuth, requireFranchiseStaff, franchiseInventoryController.adjustItem);
-
-/**
- * @swagger
- * /api/dev/franchise/inventory/seed:
- *   post:
- *     tags: [Franchise]
- *     summary: Seed 1 product vào kho của store hiện tại (insert/update franchise_inventory_item)
- *     description: Insert vào franchise_inventory_item, nếu trùng (inventory_id, product_id) thì update on_hand_qty.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/SeedInventoryItemRequest'
- *           example:
- *             product_id: 1
- *             qty: 100
- *     responses:
- *       200:
- *         description: Seed thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/FranchiseInventoryItemRow'
- *                 message:
- *                   type: string
- *                   example: "Seed thành công"
- *             example:
- *               success: true
- *               data:
- *                 inventory_item_id: 2
- *                 inventory_id: 1
- *                 product_id: 1
- *                 on_hand_qty: "100.000"
- *                 reserved_qty: "0.000"
- *                 last_updated_at: "2026-02-24T07:15:00.000Z"
- *               message: "Seed thành công"
- *       400:
- *         description: Store chưa có inventory
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Store chưa có inventory"
- *       401:
- *         description: Chưa đăng nhập / token không hợp lệ
- *       403:
- *         description: Không đúng role franchise staff
- *       500:
- *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Server error"
- */
-router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff, franchiseInventoryController.seedInventoryItem);
 
 /**
  * @swagger
