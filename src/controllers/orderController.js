@@ -185,23 +185,30 @@ async function getOrders(req, res) {
                 success: false,
                 message: "Không có quyền xem đơn"
             });
-
         }
 
         const rs = await pool.query(
             `
             SELECT
-            o.order_id,
-            o.order_code,
-            o.status,
-            o.created_at,
-            o.desired_date,
-            COUNT(oi.order_item_id) total_items
+                o.order_id,
+                o.order_code,
+                o.status,
+                o.created_at,
+                o.desired_date,
+                COUNT(oi.order_item_id) AS total_items,
+                STRING_AGG(DISTINCT p.name, ', ') AS product_names
             FROM orders o
             LEFT JOIN order_item oi
-            ON oi.order_id=o.order_id
-            WHERE o.franchise_store_id=$1
-            GROUP BY o.order_id
+                ON oi.order_id = o.order_id
+            LEFT JOIN product p
+                ON p.product_id = oi.product_id
+            WHERE o.franchise_store_id = $1
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.status,
+                o.created_at,
+                o.desired_date
             ORDER BY o.created_at DESC
             `,
             [req.user.franchise_store_id]
