@@ -940,6 +940,96 @@ router.post("/orders", requireAuth, requireFranchiseStaff, orderController.creat
 
 /**
  * @swagger
+ * /api/orders/{orderId}:
+ *   delete:
+ *     summary: Hủy/Xóa đơn hàng của franchise
+ *     description: |
+ *       Franchise staff được phép xóa đơn hàng của chính cửa hàng mình.
+ *       Chỉ cho phép xóa khi đơn đang ở trạng thái **pending**.
+ *       Khi xóa thành công, dữ liệu trong `order_item` và `orders` sẽ bị xóa khỏi hệ thống.
+ *     tags:
+ *       - Franchise
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         description: ID của đơn hàng cần xóa
+ *         schema:
+ *           type: integer
+ *           example: 93
+ *     responses:
+ *       200:
+ *         description: Xóa đơn hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Hủy đơn hàng thành công
+ *       400:
+ *         description: orderId không hợp lệ hoặc trạng thái đơn không cho phép xóa
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: orderId không hợp lệ
+ *       403:
+ *         description: Không có quyền xóa đơn hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Không có quyền hủy đơn
+ *       404:
+ *         description: Không tìm thấy đơn hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Không tìm thấy đơn hàng
+ *       500:
+ *         description: Lỗi server khi xóa đơn hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Lỗi server khi hủy đơn hàng
+ */
+router.delete("/orders/:orderId", requireAuth, requireFranchiseStaff, orderController.cancelOrder);
+
+/**
+ * @swagger
  * /api/centralKitchen/orders/new:
  *   get:
  *     summary: Danh sách đơn hàng mới (pending)

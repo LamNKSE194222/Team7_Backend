@@ -231,4 +231,106 @@ async function getOrders(req, res) {
 
 }
 
-module.exports = { createOrder, getOrders };
+async function cancelOrder(req, res) {
+    const client = await pool.connect();
+
+    try {
+        const franchiseStoreId = req.user?.franchise_store_id;
+        const { orderId } = req.params;
+
+        if (!franchiseStoreId) {
+            return res.status(403).json({
+                success: false,
+                message: "Không có quyền hủy đơn"
+            });
+        }
+
+        if (!orderId || isNaN(orderId)) {
+            return res.status(400).json({
+                success: false,
+                message: "orderId không hợp lệ"
+            });
+        }
+
+        await client.query("BEGIN");
+
+        // Khóa dòng đơn hàng để tránh bị update đồng thời
+        const orderRs = await client.query(
+            `
+            SELECT
+                order_id,
+                order_code,
+                franchise_store_id,
+                status
+            FROM orders
+            WHERE order_id = $1
+            FOR UPDATE
+            `,
+            [orderId]
+        );
+
+        if (orderRs.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({
+                success: false,
+                message: "Không tìm thấy đơn hàng"
+            });
+        }
+
+        const order = orderRs.rows[0];
+
+        // Kiểm tra đúng cửa hàng
+        if (Number(order.franchise_store_id) !== Number(franchiseStoreId)) {
+            await client.query("ROLLBACK");
+            return res.status(403).json({
+                success: false,
+                message: "Bạn không có quyền hủy đơn hàng này"
+            });
+        }
+
+        if (order.status !== "pending") {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                success: false,
+                message: `Chỉ được xóa đơn khi trạng thái là pending. Hiện tại: ${order.status}`
+            });
+        }
+
+        await client.query(
+            `
+            DELETE FROM order_item
+            WHERE order_id = $1
+            `,
+            [orderId]
+        );
+
+        await client.query(
+            `
+            DELETE FROM orders
+            WHERE order_id = $1
+            `,
+            [orderId]
+        );
+
+        await client.query("COMMIT");
+
+        return res.status(200).json({
+            success: true,
+            message: "Hủy đơn hàng thành công"
+        });
+
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("CANCEL ORDER ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Lỗi server khi hủy đơn hàng"
+        });
+    } finally {
+        client.release();
+    }
+}
+
+
+module.exports = { createOrder, getOrders, cancelOrder };
