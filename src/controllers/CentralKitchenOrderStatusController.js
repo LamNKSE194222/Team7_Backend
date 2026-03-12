@@ -41,7 +41,7 @@ exports.readyToDeliver = async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(403).json({
                 success: false,
-                message: "You cannot process this order",
+                message: "Bạn không thể xử lý đơn hàng này",
             });
         }
 
@@ -49,17 +49,18 @@ exports.readyToDeliver = async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(400).json({
                 success: false,
-                message: "Order must be processing first",
+                message: "Đơn hàng phải ở trạng thái processing trước",
             });
         }
 
         await client.query(
             `
-                UPDATE orders
-                SET status = 'fulfilled',
-                    fulfilled_at = NOW()
-                WHERE order_id = $1
-                `,
+            UPDATE orders
+            SET status = 'fulfilled',
+                fulfilled_at = NOW(),
+                delivery_date = CURRENT_DATE
+            WHERE order_id = $1
+            `,
             [orderId]
         );
 
@@ -67,12 +68,11 @@ exports.readyToDeliver = async (req, res) => {
 
         return res.json({
             success: true,
-            message: "Order marked as fulfilled",
+            message: "Đã cập nhật đơn hàng sang trạng thái sẵn sàng giao",
         });
-
     } catch (err) {
         await client.query("ROLLBACK");
-        console.error(err);
+        console.error("readyToDeliver error:", err);
 
         return res.status(500).json({
             success: false,
@@ -102,11 +102,11 @@ exports.delivered = async (req, res) => {
             });
         }
 
-        if (order.central_kitchen_id !== kitchenId) {
+        if (Number(order.central_kitchen_id) !== Number(kitchenId)) {
             await client.query("ROLLBACK");
             return res.status(403).json({
                 success: false,
-                message: "You cannot process this order",
+                message: "Bạn không thể xử lý đơn hàng này",
             });
         }
 
@@ -122,7 +122,7 @@ exports.delivered = async (req, res) => {
             `
             UPDATE orders
             SET status = 'confirmed',
-                confirmed_at = NOW()
+                delivered_at = NOW()
             WHERE order_id = $1
             `,
             [orderId]
@@ -130,16 +130,15 @@ exports.delivered = async (req, res) => {
 
         await client.query("COMMIT");
 
-        res.json({
+        return res.json({
             success: true,
             message: "Order confirmed successfully",
         });
-
     } catch (err) {
         await client.query("ROLLBACK");
-        console.error(err);
+        console.error("delivered error:", err);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Server error",
         });
@@ -158,22 +157,37 @@ exports.getFulfilledOrders = async (req, res) => {
             SELECT
                 o.order_id,
                 o.order_code,
-                o.status,
-                o.fulfilled_at,
                 o.franchise_store_id,
-                oi.product_id,
-                p.name AS product_name,
-                oi.qty,
-                oi.uom,
-                oi.unit_price
+                fs.name AS store_name,
+                o.central_kitchen_id,
+                o.status,
+                o.created_at,
+                o.fulfilled_at,
+                o.delivery_date,
+                o.received_confirmed_at,
+                COUNT(oi.order_item_id) AS total_products,
+                STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names
             FROM orders o
-            JOIN order_item oi
+            LEFT JOIN franchise_store fs
+                ON fs.franchise_store_id = o.franchise_store_id
+            LEFT JOIN order_item oi
                 ON oi.order_id = o.order_id
-            JOIN product p
+            LEFT JOIN product p
                 ON p.product_id = oi.product_id
             WHERE o.central_kitchen_id = $1
               AND o.status = 'fulfilled'
-            ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC, oi.order_item_id ASC
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.franchise_store_id,
+                fs.name,
+                o.central_kitchen_id,
+                o.status,
+                o.created_at,
+                o.fulfilled_at,
+                o.delivery_date,
+                o.received_confirmed_at
+            ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC
             `,
             [kitchenId]
         );
@@ -184,7 +198,7 @@ exports.getFulfilledOrders = async (req, res) => {
             message: null,
         });
     } catch (err) {
-        console.error(err);
+        console.error("getFulfilledOrders error:", err);
         return res.status(500).json({
             success: false,
             data: null,
@@ -242,7 +256,7 @@ exports.getProcessingOrders = async (req, res) => {
             message: null,
         });
     } catch (err) {
-        console.error(err);
+        console.error("getProcessingOrders error:", err);
         return res.status(500).json({
             success: false,
             data: null,

@@ -1,25 +1,15 @@
 const pool = require("../config/database");
 async function getCentralKitchenMaterialsInventory(req, res) {
-    try {
-        const role = req.user?.role;
-        const allowed = ["kitchen_staff"];
-        if (!allowed.includes(role)) {
-            return res.status(403).json({ success: false, data: null, message: "Forbidden" });
-        }
+  try {
+    const kitchenId = req.user.central_kitchen_id;
+    const expiryDays = Number(req.query.expiry_days ?? 60);
+    const limit = Number(req.query.limit ?? 50);
+    const expiringLimit = Number(req.query.expiring_limit ?? 8);
+    const includeExpired = String(req.query.include_expired ?? "true") === "true";
 
-        const kitchenId = req.user?.central_kitchen_id;
-        if (!kitchenId) {
-            return res.status(403).json({ success: false, data: null, message: "Not kitchen staff" });
-        }
-
-        const expiryDays = Number(req.query.expiry_days ?? 60);
-        const limit = Number(req.query.limit ?? 50);
-        const expiringLimit = Number(req.query.expiring_limit ?? 8);
-        const includeExpired = String(req.query.include_expired ?? "true") === "true";
-
-        // 1) BOX: nguyên liệu sắp hết hạn (top N)
-        // Lưu ý: expiry_date là DATE, tính days_left bằng (expiry_date - CURRENT_DATE)
-        const expiringSql = `
+    // 1) BOX: nguyên liệu sắp hết hạn (top N)
+    // Lưu ý: expiry_date là DATE, tính days_left bằng (expiry_date - CURRENT_DATE)
+    const expiringSql = `
       SELECT
         m.material_id,
         m.name AS material_name,
@@ -40,11 +30,11 @@ async function getCentralKitchenMaterialsInventory(req, res) {
       LIMIT $3
     `;
 
-        const expiringRs = await pool.query(expiringSql, [kitchenId, expiryDays, expiringLimit]);
+    const expiringRs = await pool.query(expiringSql, [kitchenId, expiryDays, expiringLimit]);
 
-        // 2) BẢNG: danh sách tồn kho nguyên liệu (có thể có / không có expiry_date)
-        // Sắp xếp: ưu tiên item có expiry_date gần nhất lên trước, còn null xuống cuối
-        const inventorySql = `
+    // 2) BẢNG: danh sách tồn kho nguyên liệu (có thể có / không có expiry_date)
+    // Sắp xếp: ưu tiên item có expiry_date gần nhất lên trước, còn null xuống cuối
+    const inventorySql = `
       SELECT
         ckii.inventory_item_id,
         m.material_id,
@@ -69,22 +59,22 @@ async function getCentralKitchenMaterialsInventory(req, res) {
       LIMIT $2
     `;
 
-        const inventoryRs = await pool.query(inventorySql, [kitchenId, limit]);
+    const inventoryRs = await pool.query(inventorySql, [kitchenId, limit]);
 
-        return res.json({
-            success: true,
-            data: {
-                expiry_days: expiryDays,
-                expiring_count: expiringRs.rowCount,
-                expiring_materials: expiringRs.rows,  // box "Sắp hết hạn"
-                inventory_items: inventoryRs.rows,    // bảng "Danh sách tồn kho"
-            },
-            message: null,
-        });
-    } catch (e) {
-        console.error("CENTRAL_KITCHEN MATERIALS INVENTORY ERROR:", e);
-        return res.status(500).json({ success: false, data: null, message: "Inventory error" });
-    }
+    return res.json({
+      success: true,
+      data: {
+        expiry_days: expiryDays,
+        expiring_count: expiringRs.rowCount,
+        expiring_materials: expiringRs.rows,  // box "Sắp hết hạn"
+        inventory_items: inventoryRs.rows,    // bảng "Danh sách tồn kho"
+      },
+      message: null,
+    });
+  } catch (e) {
+    console.error("CENTRAL_KITCHEN MATERIALS INVENTORY ERROR:", e);
+    return res.status(500).json({ success: false, data: null, message: "Inventory error" });
+  }
 }
 
 module.exports = { getCentralKitchenMaterialsInventory };

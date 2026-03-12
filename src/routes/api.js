@@ -18,6 +18,7 @@ const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralK
 const receiveConfirmController = require("../controllers/receiveConfirmController");
 const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../controllers/CentralKitchenOrderStatusController");
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
+const ManagerProductController = require("../controllers/manager_product_controller.js");
 
 /**
  * @swagger
@@ -727,7 +728,7 @@ router.get("/products", requireAuth, productController.list);
  *     401:
  *       description: Unauthorized
  */
-router.get("/franchiseStaff_dashboard", requireAuth, Fdashboard);
+router.get("/franchiseStaff_dashboard", requireAuth, requireFranchiseStaff, Fdashboard);
 
 /**
  * @swagger
@@ -800,51 +801,92 @@ router.get("/franchiseStaff_dashboard", requireAuth, Fdashboard);
  *       500:
  *         description: Server error
  */
-router.get("/CentralKitchenStaff_dashborad", requireAuth, Cdashboard);
+router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, Cdashboard);
 
 /**
  * @swagger
- * /api/ViewOrders:
- *   get:
- *     summary: Xem danh sách đơn hàng
+ * /api/orders/{orderId}/confirm-receipt:
+ *   post:
+ *     summary: Xác nhận đã nhận hàng
  *     description: |
- *       Lấy danh sách đơn hàng của franchise store hiện tại.
- *       - Chỉ franchise staff được phép truy cập
- *       - Có thể lọc theo trạng thái đơn hàng hoặc tìm theo mã đơn
+ *       Franchise staff xác nhận đã nhận đơn hàng khi đơn ở trạng thái **fulfilled**.
+ *       
+ *       Khi xác nhận thành công:
+ *       - cập nhật trạng thái đơn hàng thành **confirmed**
+ *       - lưu thời gian xác nhận nhận hàng
+ *       - cộng sản phẩm từ đơn hàng vào kho của franchise store
+ *       - có thể lưu rating và comment
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: status
- *         required: false
- *         description: Lọc theo trạng thái đơn hàng
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         description: ID của đơn hàng cần xác nhận nhận
  *         schema:
- *           type: string
- *           enum:
- *             - pending
- *             - approved
- *             - processing
- *             - fulfilled
- *             - cancelled
- *       - in: query
- *         name: keyword
- *         required: false
- *         description: Tìm kiếm theo mã đơn hàng (order_code)
- *         schema:
- *           type: string
+ *           type: integer
+ *           example: 80
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rating
+ *             properties:
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 5
+ *               comment:
+ *                 type: string
+ *                 maxLength: 1000
+ *                 example: Hàng giao đủ và đúng chất lượng
  *     responses:
  *       200:
- *         description: Lấy danh sách đơn hàng thành công
+ *         description: Xác nhận nhận hàng thành công
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/OrderListResponse'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Đã xác nhận nhận hàng và cộng vào kho franchise
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     order_id:
+ *                       type: string
+ *                       example: "80"
+ *                     order_code:
+ *                       type: string
+ *                       example: "ORD-1773243947686"
+ *                     status:
+ *                       type: string
+ *                       example: "confirmed"
+ *                     received_confirmed_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-03-11T16:03:09.132Z"
+ *                     inventory_updated_count:
+ *                       type: integer
+ *                       example: 1
+ *       400:
+ *         description: Sai trạng thái đơn hàng hoặc dữ liệu không hợp lệ
  *       401:
  *         description: Unauthorized - Chưa đăng nhập
  *       403:
- *         description: Forbidden - Không có quyền xem đơn hàng
+ *         description: Không có quyền với đơn hàng này
+ *       404:
+ *         description: Không tìm thấy đơn hàng
  *       500:
  *         description: Server error
  */
@@ -895,15 +937,6 @@ router.get("/ViewOrders", requireAuth, getOrders);
  *         description: Forbidden
  */
 router.post("/orders", requireAuth, requireFranchiseStaff, orderController.createOrder);
-
-router.get("/health/db", async (req, res) => {
-    try {
-        const r = await pool.query("SELECT NOW() as now");
-        res.json({ ok: true, now: r.rows[0].now });
-    } catch (e) {
-        res.status(500).json({ ok: false, error: e.message });
-    }
-});
 
 /**
  * @swagger
@@ -1324,184 +1357,6 @@ router.get("/franchise/inventory/storage", requireAuth, requireFranchiseStaff, f
 
 /**
  * @swagger
- * /api/franchise/inventory/items/{inventoryItemId}/adjust:
- *   post:
- *     tags: [Franchise]
- *     summary: Điều chỉnh số lượng on_hand_qty của 1 inventory item (+/-)
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: inventoryItemId
- *         required: true
- *         schema:
- *           type: integer
- *         example: 2
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AdjustInventoryItemRequest'
- *           example:
- *             delta: -5
- *     responses:
- *       200:
- *         description: Adjust thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/AdjustInventoryItemResult'
- *                 message:
- *                   type: string
- *                   example: "Adjusted"
- *             example:
- *               success: true
- *               data:
- *                 inventory_item_id: 2
- *                 product_id: 1
- *                 old_qty: 70
- *                 new_qty: 65
- *                 adjusted_by_staff_id: 10
- *               message: "Adjusted"
- *       400:
- *         description: Validation error hoặc không đủ tồn để trừ
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *             examples:
- *               invalidInput:
- *                 summary: delta không hợp lệ
- *                 value:
- *                   success: false
- *                   data: null
- *                   message: "delta phải là number và khác 0"
- *                   error_code: "VALIDATION_ERROR"
- *               insufficientStock:
- *                 summary: Không đủ tồn để trừ
- *                 value:
- *                   success: false
- *                   data: null
- *                   message: "Không đủ tồn để trừ"
- *                   error_code: "INSUFFICIENT_STOCK"
- *       404:
- *         description: Inventory item không tồn tại
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *             example:
- *               success: false
- *               data: null
- *               message: "Inventory item không tồn tại"
- *               error_code: "NOT_FOUND"
- *       401:
- *         description: Chưa đăng nhập / token không hợp lệ
- *       403:
- *         description: Không đúng role franchise staff
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *             example:
- *               success: false
- *               data: null
- *               message: "Internal server error"
- *               error_code: "INTERNAL_ERROR"
- */
-router.post("/franchise/inventory/items/:inventoryItemId/adjust", requireAuth, requireFranchiseStaff, franchiseInventoryController.adjustItem);
-
-/**
- * @swagger
- * /api/dev/franchise/inventory/seed:
- *   post:
- *     tags: [Franchise]
- *     summary: Seed 1 product vào kho của store hiện tại (insert/update franchise_inventory_item)
- *     description: Insert vào franchise_inventory_item, nếu trùng (inventory_id, product_id) thì update on_hand_qty.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/SeedInventoryItemRequest'
- *           example:
- *             product_id: 1
- *             qty: 100
- *     responses:
- *       200:
- *         description: Seed thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/FranchiseInventoryItemRow'
- *                 message:
- *                   type: string
- *                   example: "Seed thành công"
- *             example:
- *               success: true
- *               data:
- *                 inventory_item_id: 2
- *                 inventory_id: 1
- *                 product_id: 1
- *                 on_hand_qty: "100.000"
- *                 reserved_qty: "0.000"
- *                 last_updated_at: "2026-02-24T07:15:00.000Z"
- *               message: "Seed thành công"
- *       400:
- *         description: Store chưa có inventory
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Store chưa có inventory"
- *       401:
- *         description: Chưa đăng nhập / token không hợp lệ
- *       403:
- *         description: Không đúng role franchise staff
- *       500:
- *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Server error"
- */
-router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff, franchiseInventoryController.seedInventoryItem);
-
-/**
- * @swagger
  * /api/central-kitchen/materials-inventory:
  *   get:
  *     tags:
@@ -1657,7 +1512,7 @@ router.post("/dev/franchise/inventory/seed", requireAuth, requireFranchiseStaff,
  *                   type: string
  *                   example: "Inventory error"
  */
-router.get("/central-kitchen/materials-inventory", requireAuth, getCentralKitchenMaterialsInventory);
+router.get("/central-kitchen/materials-inventory", requireAuth, requireKitchenStaff, getCentralKitchenMaterialsInventory);
 
 /**
  * @swagger
@@ -1830,9 +1685,7 @@ router.post("/centralKitchen/orders/:orderId/ready-to-deliver", requireAuth, req
  *       500:
  *         description: Load product inventory error
  */
-router.get("/centralKitchen/product-inventory", requireAuth, getCentralKitchenProductInventory);
-
-// ==================== MANAGER ROUTES ====================
+router.get("/centralKitchen/product-inventory", requireAuth, requireKitchenStaff, getCentralKitchenProductInventory);
 
 /**
  * @swagger
@@ -1929,5 +1782,254 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
  *         description: OK
  */
 router.get("/manager/inventory", requireAuth, requireRole("manager", "admin"), getManagerStorage);
+
+/**
+ * @swagger
+ * /api/Manager_create_products:
+ *   post:
+ *     summary: Create a new product with materials
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - product_type_id
+ *               - name
+ *               - uom
+ *               - sku
+ *               - price
+ *             properties:
+ *               product_type_id:
+ *                 type: integer
+ *                 example: 1
+ *               name:
+ *                 type: string
+ *                 example: Bánh Trung Thu - Đậu Xanh 150g
+ *               uom:
+ *                 type: string
+ *                 example: cái
+ *               sku:
+ *                 type: string
+ *                 example: SKU-MC-MUNG-150
+ *               price:
+ *                 type: number
+ *                 example: 45000
+ *               description:
+ *                 type: string
+ *                 example: Bánh trung thu nhân đậu xanh truyền thống
+ *               materials:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - material_id
+ *                     - qty_required
+ *                     - uom
+ *                   properties:
+ *                     material_id:
+ *                       type: integer
+ *                       example: 1
+ *                     qty_required:
+ *                       type: number
+ *                       example: 0.05
+ *                     uom:
+ *                       type: string
+ *                       example: kg
+ *                     note:
+ *                       type: string
+ *                       example: Bột mì làm vỏ bánh
+ *     responses:
+ *       201:
+ *         description: Product created successfully
+ *       400:
+ *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.post("/Manager_create_products", requireAuth, requireRole("manager", "admin"), ManagerProductController.createProduct);
+
+/**
+ * @swagger
+ * /api/Manager_view_products:
+ *   get:
+ *     summary: Get all products
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Product list retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.get("/Manager_view_products", requireAuth, requireRole("manager", "admin"), ManagerProductController.getProducts);
+
+/**
+ * @swagger
+ * /api/Manager_view_detail_products/{id}:
+ *   get:
+ *     summary: Get product detail by ID
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Product detail retrieved successfully
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.getProductById);
+
+/**
+ * @swagger
+ * /api/Manager_update_products/{id}:
+ *   put:
+ *     summary: Update product information and materials
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               product_type_id:
+ *                 type: integer
+ *                 example: 1
+ *               name:
+ *                 type: string
+ *                 example: Bánh Trung Thu - Đậu Xanh 150g Updated
+ *               uom:
+ *                 type: string
+ *                 example: cái
+ *               sku:
+ *                 type: string
+ *                 example: SKU-MC-MUNG-150
+ *               price:
+ *                 type: number
+ *                 example: 48000
+ *               description:
+ *                 type: string
+ *                 example: Bánh trung thu đậu xanh đã cập nhật
+ *               is_active:
+ *                 type: boolean
+ *                 example: true
+ *               materials:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - material_id
+ *                     - qty_required
+ *                     - uom
+ *                   properties:
+ *                     material_id:
+ *                       type: integer
+ *                       example: 1
+ *                     qty_required:
+ *                       type: number
+ *                       example: 0.05
+ *                     uom:
+ *                       type: string
+ *                       example: kg
+ *                     note:
+ *                       type: string
+ *                       example: Bột mì cập nhật
+ *     responses:
+ *       200:
+ *         description: Product updated successfully
+ *       400:
+ *         description: Invalid input
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.put("/Manager_update_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.updateProduct);
+
+/**
+ * @swagger
+ * /api/Manager_delete_products/{id}:
+ *   delete:
+ *     summary: Soft delete product (set is_active = false)
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Product deleted successfully
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.delete("/Manager_delete_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.deleteProduct);
+
+/**
+ * @swagger
+ * /api/Manager_restore_products/{id}:
+ *   patch:
+ *     summary: Restore soft-deleted product (set is_active = true)
+ *     tags: [Manager Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Product restored successfully
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.patch("/Manager_restore_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.restoreProduct);
 
 module.exports = router;

@@ -63,7 +63,6 @@ async function confirmReceipt(req, res) {
             });
         }
 
-        // đã hoàn tất rồi
         if (order.status === "confirmed") {
             await client.query("ROLLBACK");
             return res.json({
@@ -76,7 +75,6 @@ async function confirmReceipt(req, res) {
             });
         }
 
-        // chỉ confirm khi đã giao tới cửa hàng
         if (order.status !== "fulfilled") {
             await client.query("ROLLBACK");
             return res.status(400).json({
@@ -85,11 +83,67 @@ async function confirmReceipt(req, res) {
             });
         }
 
+        const inventoryResult = await client.query(
+            `
+            SELECT inventory_id
+            FROM franchise_inventory
+            WHERE franchise_store_id = $1
+            ORDER BY inventory_id
+            LIMIT 1
+            FOR UPDATE
+            `,
+            [storeId]
+        );
+
+        if (inventoryResult.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                success: false,
+                message: "Franchise store chưa có kho inventory"
+            });
+        }
+
+        const inventoryId = inventoryResult.rows[0].inventory_id;
+
+        const inventoryUpsert = await client.query(
+            `
+            INSERT INTO franchise_inventory_item (
+                inventory_id,
+                product_id,
+                on_hand_qty,
+                last_updated_at
+            )
+            SELECT
+                $1,
+                oi.product_id,
+                SUM(oi.qty),
+                NOW()
+            FROM order_item oi
+            WHERE oi.order_id = $2
+            GROUP BY oi.product_id
+            ON CONFLICT (inventory_id, product_id)
+            DO UPDATE
+            SET
+                on_hand_qty = franchise_inventory_item.on_hand_qty + EXCLUDED.on_hand_qty,
+                last_updated_at = NOW()
+            RETURNING inventory_id, product_id, on_hand_qty
+            `,
+            [inventoryId, orderId]
+        );
+
+        if (inventoryUpsert.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                success: false,
+                message: "Đơn hàng không có sản phẩm để nhập kho"
+            });
+        }
+
         const updated = await client.query(
             `
             UPDATE orders
             SET status = 'confirmed',
-                received_confirmed_at = now(),
+                received_confirmed_at = NOW(),
                 received_confirmed_by_staff_id = $1,
                 received_rating = $2,
                 received_comment = $3
@@ -103,17 +157,20 @@ async function confirmReceipt(req, res) {
 
         return res.json({
             success: true,
-            message: "Đã xác nhận nhận hàng",
-            data: updated.rows[0]
+            message: "Đã xác nhận nhận hàng và cộng vào kho franchise",
+            data: {
+                ...updated.rows[0],
+                inventory_updated_count: inventoryUpsert.rowCount
+            }
         });
 
     } catch (err) {
         await client.query("ROLLBACK");
-        console.error(err);
+        console.error("CONFIRM RECEIPT ERROR:", err);
 
         return res.status(500).json({
             success: false,
-            message: "Server error"
+            message: err.message
         });
     } finally {
         client.release();
@@ -131,7 +188,8 @@ async function listOrders(req, res) {
                 o.order_code,
                 o.status,
                 o.created_at,
-                o.delivered_at,
+                TO_CHAR(o.delivery_date, 'YYYY-MM-DD') AS delivery_date,
+                o.fulfilled_at,
                 o.received_confirmed_at,
                 COUNT(DISTINCT oi.product_id) AS total_products,
                 COALESCE(
@@ -151,9 +209,10 @@ async function listOrders(req, res) {
                 o.order_code,
                 o.status,
                 o.created_at,
-                o.delivered_at,
+                o.delivery_date,
+                o.fulfilled_at,
                 o.received_confirmed_at
-            ORDER BY o.created_at DESC
+            ORDER BY o.delivery_date DESC NULLS LAST, o.order_id DESC
             LIMIT 50
         `;
 
