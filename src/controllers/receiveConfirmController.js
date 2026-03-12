@@ -188,7 +188,6 @@ async function listOrders(req, res) {
                 o.order_code,
                 o.status,
                 o.created_at,
-                TO_CHAR(o.delivery_date, 'YYYY-MM-DD') AS delivery_date,
                 o.fulfilled_at,
                 o.received_confirmed_at,
                 COUNT(DISTINCT oi.product_id) AS total_products,
@@ -209,7 +208,6 @@ async function listOrders(req, res) {
                 o.order_code,
                 o.status,
                 o.created_at,
-                o.delivery_date,
                 o.fulfilled_at,
                 o.received_confirmed_at
             ORDER BY o.delivery_date DESC NULLS LAST, o.order_id DESC
