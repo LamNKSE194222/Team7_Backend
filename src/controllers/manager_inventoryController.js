@@ -23,6 +23,7 @@ async function getManagerStorage(req, res) {
                 ((COALESCE(fii.on_hand_qty,0) - COALESCE(fii.reserved_qty,0))::int) AS quantity,
                 fii.on_hand_qty,
                 fii.reserved_qty,
+                fii.expiry_date,
                 fii.last_updated_at
             FROM franchise_inventory inv
             JOIN franchise_inventory_item fii ON fii.inventory_id = inv.inventory_id

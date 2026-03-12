@@ -30,6 +30,10 @@ async function Fdashboard(req, res) {
         const cards = { pending: 0, approved: 0, processing: 0, fulfilled: 0 };
         for (const r of statusRs.rows) cards[r.status] = r.count;
 
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const offset = (page - 1) * limit;
+
         // Đơn gần đây + số sản phẩm + ngày giao
         const recentRs = await pool.query(
             `
@@ -45,9 +49,9 @@ async function Fdashboard(req, res) {
       WHERE o.franchise_store_id = $1
       GROUP BY o.order_id
       ORDER BY o.created_at DESC
-      LIMIT 5
+      LIMIT $2 OFFSET $3
       `,
-            [storeId]
+            [storeId, limit, offset]
         );
 
         return res.json({
