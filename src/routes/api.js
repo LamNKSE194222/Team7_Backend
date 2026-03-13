@@ -697,36 +697,154 @@ router.get("/products", requireAuth, productController.list);
  * /api/franchiseStaff_dashboard:
  *   get:
  *     summary: Franchise staff dashboard
- *     description: Fetch dashboard data for franchise staff
+ *     description: |
+ *       Lấy dữ liệu tổng quan cho cửa hàng franchise hiện tại, bao gồm:
+ *       - tổng tiền đã thanh toán
+ *       - tổng tiền chờ thanh toán
+ *       - tổng số đơn hàng
+ *       - số lượng đơn theo từng trạng thái
+ *       - danh sách đơn hàng gần đây
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Dashboard data
+ *         description: Lấy dashboard thành công
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *                 - type: object
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
  *                   properties:
- *                     data:
+ *                     summary:
  *                       type: object
  *                       properties:
- *                         cards:
- *                           $ref: '#/components/schemas/DashboardCards'
- *                         pending_orders:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/OrderSummary'
- *                         recent_orders:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/OrderSummary'
- *     401:
- *       description: Unauthorized
+ *                         paid_amount:
+ *                           type: number
+ *                           example: 4000000
+ *                           description: Tổng tiền các đơn đã thanh toán
+ *                         unpaid_amount:
+ *                           type: number
+ *                           example: 8000000
+ *                           description: Tổng tiền các đơn chưa thanh toán
+ *                         total_orders:
+ *                           type: integer
+ *                           example: 3
+ *                           description: Tổng số đơn hàng của cửa hàng
+ *                     cards:
+ *                       type: object
+ *                       properties:
+ *                         pending:
+ *                           type: integer
+ *                           example: 1
+ *                           description: Số đơn chờ xử lý
+ *                         approved:
+ *                           type: integer
+ *                           example: 0
+ *                           description: Số đơn đã chấp nhận
+ *                         processing:
+ *                           type: integer
+ *                           example: 0
+ *                           description: Số đơn đang chuẩn bị
+ *                         fulfilled:
+ *                           type: integer
+ *                           example: 2
+ *                           description: Số đơn sẵn sàng giao
+ *                         confirmed:
+ *                           type: integer
+ *                           example: 1
+ *                           description: Số đơn đã giao và đã xác nhận nhận hàng
+ *                         cancelled:
+ *                           type: integer
+ *                           example: 0
+ *                           description: Số đơn đã hủy
+ *                     recent_orders:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           order_id:
+ *                             type: integer
+ *                             example: 91
+ *                           order_code:
+ *                             type: string
+ *                             example: "ORD-1773278920610"
+ *                           status:
+ *                             type: string
+ *                             example: "confirmed"
+ *                           payment_status:
+ *                             type: string
+ *                             example: "paid"
+ *                             description: |
+ *                               Trạng thái thanh toán của đơn.
+ *                               Ví dụ: unpaid, pending, paid
+ *                           created_at:
+ *                             type: string
+ *                             format: date-time
+ *                             example: "2026-03-12T01:28:40.608Z"
+ *                           desired_date:
+ *                             type: string
+ *                             format: date-time
+ *                             example: "2026-03-12T00:00:00.000Z"
+ *                           fulfilled_at:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *                             example: "2026-03-11T18:29:27.027Z"
+ *                           total_amount:
+ *                             type: number
+ *                             example: 4000000
+ *                             description: Tổng tiền của đơn hàng
+ *                           total_items:
+ *                             type: integer
+ *                             example: 2
+ *                             description: Số loại sản phẩm trong đơn
+ *                           total_product_qty:
+ *                             type: integer
+ *                             example: 15
+ *                             description: Tổng số lượng sản phẩm trong đơn
+ *                           product_names:
+ *                             type: string
+ *                             example: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
+ *                             description: Danh sách tên sản phẩm trong đơn
+ *               example:
+ *                 success: true
+ *                 data:
+ *                   summary:
+ *                     paid_amount: 4000000
+ *                     unpaid_amount: 8000000
+ *                     total_orders: 3
+ *                   cards:
+ *                     pending: 1
+ *                     approved: 0
+ *                     processing: 0
+ *                     fulfilled: 2
+ *                     confirmed: 1
+ *                     cancelled: 0
+ *                   recent_orders:
+ *                     - order_id: 91
+ *                       order_code: "ORD-1773278920610"
+ *                       status: "confirmed"
+ *                       payment_status: "paid"
+ *                       created_at: "2026-03-12T01:28:40.608Z"
+ *                       desired_date: "2026-03-12T00:00:00.000Z"
+ *                       fulfilled_at: "2026-03-11T18:29:27.027Z"
+ *                       total_amount: 4000000
+ *                       total_items: 2
+ *                       total_product_qty: 15
+ *                       product_names: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Không có quyền xem dashboard
+ *       500:
+ *         description: Server error
  */
 router.get("/franchiseStaff_dashboard", requireAuth, requireFranchiseStaff, Fdashboard);
 
@@ -805,50 +923,16 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
 
 /**
  * @swagger
- * /api/orders/{orderId}/confirm-receipt:
- *   post:
- *     summary: Xác nhận đã nhận hàng
- *     description: |
- *       Franchise staff xác nhận đã nhận đơn hàng khi đơn ở trạng thái **fulfilled**.
- *       
- *       Khi xác nhận thành công:
- *       - cập nhật trạng thái đơn hàng thành **confirmed**
- *       - lưu thời gian xác nhận nhận hàng
- *       - cộng sản phẩm từ đơn hàng vào kho của franchise store
- *       - có thể lưu rating và comment
+ * /api/ViewOrders:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng của franchise store hiện tại
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: orderId
- *         required: true
- *         description: ID của đơn hàng cần xác nhận nhận
- *         schema:
- *           type: integer
- *           example: 80
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - rating
- *             properties:
- *               rating:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 5
- *                 example: 5
- *               comment:
- *                 type: string
- *                 maxLength: 1000
- *                 example: Hàng giao đủ và đúng chất lượng
  *     responses:
  *       200:
- *         description: Xác nhận nhận hàng thành công
+ *         description: Lấy danh sách đơn hàng thành công
  *         content:
  *           application/json:
  *             schema:
@@ -857,36 +941,50 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 message:
- *                   type: string
- *                   example: Đã xác nhận nhận hàng và cộng vào kho franchise
  *                 data:
- *                   type: object
- *                   properties:
- *                     order_id:
- *                       type: string
- *                       example: "80"
- *                     order_code:
- *                       type: string
- *                       example: "ORD-1773243947686"
- *                     status:
- *                       type: string
- *                       example: "confirmed"
- *                     received_confirmed_at:
- *                       type: string
- *                       format: date-time
- *                       example: "2026-03-11T16:03:09.132Z"
- *                     inventory_updated_count:
- *                       type: integer
- *                       example: 1
- *       400:
- *         description: Sai trạng thái đơn hàng hoặc dữ liệu không hợp lệ
- *       401:
- *         description: Unauthorized - Chưa đăng nhập
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       order_id:
+ *                         type: integer
+ *                         example: 80
+ *                       order_code:
+ *                         type: string
+ *                         example: ORD-1773243947686
+ *                       status:
+ *                         type: string
+ *                         example: confirmed
+ *                       payment_status:
+ *                         type: string
+ *                         example: unpaid
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-11T16:03:09.132Z"
+ *                       desired_date:
+ *                         type: string
+ *                         format: date
+ *                         example: "2026-03-12"
+ *                       fulfilled_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         example: "2026-03-12T10:00:00.000Z"
+ *                       total_amount:
+ *                         type: number
+ *                         example: 135000
+ *                       total_items:
+ *                         type: integer
+ *                         example: 2
+ *                       total_product_qty:
+ *                         type: integer
+ *                         example: 15
+ *                       product_names:
+ *                         type: string
+ *                         example: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - thập cẩm 150g"
  *       403:
- *         description: Không có quyền với đơn hàng này
- *       404:
- *         description: Không tìm thấy đơn hàng
+ *         description: Không có quyền xem đơn
  *       500:
  *         description: Server error
  */

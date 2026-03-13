@@ -2,16 +2,12 @@ const pool = require('../config/database');
 const autoApproveOrder = require("../services/autoApproveOrder");
 
 // CREATE ORDER (Franchise staff)
-
 async function createOrder(req, res) {
-
     let client;
 
     try {
-
         const { desired_date, note, items } = req.body || {};
 
-        // validate input
         if (!desired_date || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -19,7 +15,6 @@ async function createOrder(req, res) {
             });
         }
 
-        // chỉ franchise staff mới tạo đơn
         if (!req.user?.franchise_store_id) {
             return res.status(403).json({
                 success: false,
@@ -27,7 +22,6 @@ async function createOrder(req, res) {
             });
         }
 
-        // gom product trùng
         const map = new Map();
 
         for (const it of items) {
@@ -56,35 +50,6 @@ async function createOrder(req, res) {
 
         const orderCode = "ORD-" + Date.now();
 
-        // tạo order
-        const orderRs = await client.query(
-            `
-            INSERT INTO orders
-            (
-                order_code,
-                franchise_store_id,
-                created_by_staff_id,
-                central_kitchen_id,
-                fulfilled_by_kitchen_staff_id,
-                status,
-                desired_date,
-                note
-            )
-            VALUES ($1,$2,$3,2,3,'pending',$4,$5)
-            RETURNING order_id, order_code, created_at
-            `,
-            [
-                orderCode,
-                req.user.franchise_store_id,
-                req.user.user_id,
-                desired_date,
-                note ?? null
-            ]
-        );
-
-        const order = orderRs.rows[0];
-
-        // lấy product info, thêm name
         const productIds = normalizedItems.map(x => x.product_id);
 
         const productRs = await client.query(
@@ -92,6 +57,7 @@ async function createOrder(req, res) {
             SELECT product_id, name, price, uom
             FROM product
             WHERE product_id = ANY($1::int[])
+              AND is_active = TRUE
             `,
             [productIds]
         );
@@ -107,43 +73,87 @@ async function createOrder(req, res) {
             ])
         );
 
-        // insert order items
+        let totalAmount = 0;
+        let totalProductQty = 0;
+        const itemDetails = [];
+
         for (const it of normalizedItems) {
             const p = productMap.get(it.product_id);
 
             if (!p) {
-                throw new Error(`Product ${it.product_id} not found`);
+                throw new Error(`Product ${it.product_id} not found or inactive`);
             }
 
+            const unitPrice = Number(p.price);
+            const qty = Number(it.qty);
+            const lineTotal = qty * unitPrice;
+
+            totalAmount += lineTotal;
+            totalProductQty += qty;
+
+            itemDetails.push({
+                product_id: it.product_id,
+                product_name: p.name,
+                qty,
+                uom: p.uom,
+                unit_price: unitPrice,
+                line_total: lineTotal
+            });
+        }
+
+        // KHÔNG lưu total_amount vào bảng orders
+        const orderRs = await client.query(
+            `
+            INSERT INTO orders
+            (
+                order_code,
+                franchise_store_id,
+                created_by_staff_id,
+                central_kitchen_id,
+                fulfilled_by_kitchen_staff_id,
+                status,
+                desired_date,
+                note
+            )
+            VALUES ($1, $2, $3, 2, 3, 'pending', $4, $5)
+            RETURNING order_id, order_code, created_at
+            `,
+            [
+                orderCode,
+                req.user.franchise_store_id,
+                req.user.user_id,
+                desired_date,
+                note ?? null
+            ]
+        );
+
+        const order = orderRs.rows[0];
+
+        for (const item of itemDetails) {
             await client.query(
                 `
                 INSERT INTO order_item
-                (order_id,product_id,qty,unit_price,uom)
-                VALUES ($1,$2,$3,$4,$5)
+                (order_id, product_id, qty, unit_price, uom)
+                VALUES ($1, $2, $3, $4, $5)
                 `,
                 [
                     order.order_id,
-                    it.product_id,
-                    it.qty,
-                    p.price,
-                    p.uom
+                    item.product_id,
+                    item.qty,
+                    item.unit_price,
+                    item.uom
                 ]
             );
         }
 
         await client.query("COMMIT");
 
-        // auto approve
         await autoApproveOrder(order.order_id);
 
         const updated = await pool.query(
             `SELECT status, created_at FROM orders WHERE order_id = $1`,
             [order.order_id]
         );
-
-        const productNames = normalizedItems
-            .map(it => productMap.get(it.product_id)?.name)
-            .filter(Boolean);
 
         return res.status(201).json({
             success: true,
@@ -152,35 +162,32 @@ async function createOrder(req, res) {
                 order_code: order.order_code,
                 status: updated.rows[0].status,
                 created_at: updated.rows[0].created_at,
-                total_products: normalizedItems.length,
-                product_names: productNames
+                total_items: itemDetails.length,
+                total_product_qty: totalProductQty,
+                total_amount: totalAmount,
+                items: itemDetails
             },
             message: "Tạo đơn thành công"
         });
 
     } catch (e) {
-
         if (client) await client.query("ROLLBACK");
 
         console.error("CREATE ORDER ERROR:", e);
 
         return res.status(500).json({
             success: false,
-            message: "Server error"
+            message: e.message || "Server error"
         });
 
     } finally {
-
         if (client) client.release();
     }
 }
 
 async function getOrders(req, res) {
-
     try {
-
         if (!req.user?.franchise_store_id) {
-
             return res.status(403).json({
                 success: false,
                 message: "Không có quyền xem đơn"
@@ -189,28 +196,38 @@ async function getOrders(req, res) {
 
         const rs = await pool.query(
             `
-            SELECT
-                o.order_id,
-                o.order_code,
-                o.status,
-                o.created_at,
-                o.desired_date,
-                COUNT(oi.order_item_id) AS total_items,
-                STRING_AGG(DISTINCT p.name, ', ') AS product_names
-            FROM orders o
-            LEFT JOIN order_item oi
-                ON oi.order_id = o.order_id
-            LEFT JOIN product p
-                ON p.product_id = oi.product_id
-            WHERE o.franchise_store_id = $1
-            GROUP BY
-                o.order_id,
-                o.order_code,
-                o.status,
-                o.created_at,
-                o.desired_date
-            ORDER BY o.created_at DESC
-            `,
+    SELECT
+        o.order_id,
+        o.order_code,
+        o.status,
+        'unpaid' AS payment_status,
+        o.created_at,
+        o.desired_date,
+        o.fulfilled_at,
+
+        COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
+        COUNT(DISTINCT oi.product_id)::int AS total_items,
+        COALESCE(SUM(oi.qty), 0)::int AS total_product_qty,
+
+        COALESCE(
+            STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
+            ''
+        ) AS product_names
+    FROM orders o
+    LEFT JOIN order_item oi
+        ON oi.order_id = o.order_id
+    LEFT JOIN product p
+        ON p.product_id = oi.product_id
+    WHERE o.franchise_store_id = $1
+    GROUP BY
+        o.order_id,
+        o.order_code,
+        o.status,
+        o.created_at,
+        o.desired_date,
+        o.fulfilled_at
+    ORDER BY o.created_at DESC
+    `,
             [req.user.franchise_store_id]
         );
 
@@ -220,15 +237,13 @@ async function getOrders(req, res) {
         });
 
     } catch (e) {
-
-        console.error(e);
+        console.error("GET ORDERS ERROR:", e);
 
         return res.status(500).json({
-            success: false
+            success: false,
+            message: "Server error"
         });
-
     }
-
 }
 
 module.exports = { createOrder, getOrders };
