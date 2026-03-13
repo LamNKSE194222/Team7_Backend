@@ -2000,7 +2000,7 @@ router.get("/manager/inventory", requireAuth, requireRole("manager", "admin"), g
  * /api/Manager_create_products:
  *   post:
  *     summary: Create a new product with materials
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -2072,7 +2072,7 @@ router.post("/Manager_create_products", requireAuth, requireRole("manager", "adm
  * /api/Manager_view_products:
  *   get:
  *     summary: Get all products
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -2090,7 +2090,7 @@ router.get("/Manager_view_products", requireAuth, requireRole("manager", "admin"
  * /api/Manager_view_detail_products/{id}:
  *   get:
  *     summary: Get product detail by ID
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2117,7 +2117,7 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  * /api/Manager_update_products/{id}:
  *   put:
  *     summary: Update product information and materials
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2195,7 +2195,7 @@ router.put("/Manager_update_products/:id", requireAuth, requireRole("manager", "
  * /api/Manager_delete_products/{id}:
  *   delete:
  *     summary: Soft delete product (set is_active = false)
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2222,7 +2222,7 @@ router.delete("/Manager_delete_products/:id", requireAuth, requireRole("manager"
  * /api/Manager_restore_products/{id}:
  *   patch:
  *     summary: Restore soft-deleted product (set is_active = true)
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:

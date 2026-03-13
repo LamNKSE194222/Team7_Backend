@@ -187,12 +187,6 @@ async function createOrder(req, res) {
 
 async function getOrders(req, res) {
     try {
-        if (!req.user?.franchise_store_id) {
-            return res.status(403).json({
-                success: false,
-                message: "Không có quyền xem đơn"
-            });
-        }
 
         const rs = await pool.query(
             `
