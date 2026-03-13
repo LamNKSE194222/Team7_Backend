@@ -190,7 +190,11 @@ async function listOrders(req, res) {
                 o.created_at,
                 o.fulfilled_at,
                 o.received_confirmed_at,
-                COUNT(DISTINCT oi.product_id) AS total_products,
+
+                COUNT(DISTINCT oi.product_id)::int AS total_products,
+                COALESCE(SUM(oi.qty), 0)::int AS total_product_qty,
+                COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
+
                 COALESCE(
                     STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
                     ''
@@ -210,7 +214,7 @@ async function listOrders(req, res) {
                 o.created_at,
                 o.fulfilled_at,
                 o.received_confirmed_at
-            ORDER BY o.delivery_date DESC NULLS LAST, o.order_id DESC
+            ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC
             LIMIT 50
         `;
 
@@ -221,6 +225,8 @@ async function listOrders(req, res) {
             data: rows.map(row => ({
                 ...row,
                 total_products: Number(row.total_products),
+                total_product_qty: Number(row.total_product_qty),
+                total_amount: Number(row.total_amount),
                 product_label: `${Number(row.total_products)} sản phẩm`
             }))
         });
