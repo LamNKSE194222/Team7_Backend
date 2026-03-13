@@ -851,6 +851,29 @@ router.get("/franchiseStaff_dashboard", requireAuth, requireFranchiseStaff, Fdas
 
 /**
  * @swagger
+ * /api/franchise/payment-orders:
+ *   get:
+ *     summary: Lấy dữ liệu trang thanh toán đơn hàng
+ *     description: |
+ *       API dùng cho trang Thanh Toán Đơn Hàng của franchise staff.
+ *       Dữ liệu được phân loại theo payment_status:
+ *       - unpaid -> Đơn Hàng Chờ Thanh Toán
+ *       - paid -> Lịch Sử Thanh Toán
+ *
+ *       Trường paid_at là thời gian đã thanh toán của đơn hàng.
+ *       Chỉ xuất hiện trong payment_history.
+ *     tags:
+ *       - Franchise
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy dữ liệu thanh toán thành công
+ */
+router.get("/franchise/payment-orders", requireAuth, requireFranchiseStaff, orderController.getPaymentOrders);
+
+/**
+ * @swagger
  * /api/CentralKitchenStaff_dashborad:
  *   get:
  *     tags:

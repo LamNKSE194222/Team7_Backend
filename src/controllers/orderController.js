@@ -347,5 +347,79 @@ async function cancelOrder(req, res) {
     }
 }
 
+async function getPaymentOrders(req, res) {
+    try {
+        if (!req.user?.franchise_store_id) {
+            return res.status(403).json({
+                success: false,
+                message: "Không có quyền xem đơn thanh toán"
+            });
+        }
 
-module.exports = { createOrder, getOrders, cancelOrder };
+        const rs = await pool.query(
+            `
+            SELECT
+                o.order_id,
+                o.order_code,
+                COALESCE(o.payment_status, 'unpaid') AS payment_status,
+                o.paid_at,
+                o.created_at,
+                COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount
+            FROM orders o
+            LEFT JOIN order_item oi
+                ON oi.order_id = o.order_id
+            WHERE o.franchise_store_id = $1
+              AND COALESCE(o.payment_status, 'unpaid') IN ('unpaid', 'paid')
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.payment_status,
+                o.paid_at,
+                o.created_at
+            ORDER BY o.created_at DESC
+            `,
+            [req.user.franchise_store_id]
+        );
+
+        const waitingPaymentOrders = rs.rows
+            .filter(row => row.payment_status === "unpaid")
+            .map(row => ({
+                order_id: row.order_id,
+                order_code: row.order_code,
+                amount: Number(row.total_amount),
+                status: "unpaid",
+                status_label: "Chờ Thanh Toán"
+            }));
+
+        const paymentHistory = rs.rows
+            .filter(row => row.payment_status === "paid")
+            .map(row => ({
+                order_id: row.order_id,
+                order_code: row.order_code,
+                amount: Number(row.total_amount),
+                paid_at: row.paid_at,
+                status: "paid",
+                status_label: "Đã Thanh Toán"
+            }));
+
+        return res.json({
+            success: true,
+            data: {
+                waiting_payment_count: waitingPaymentOrders.length,
+                paid_count: paymentHistory.length,
+                waiting_payment_orders: waitingPaymentOrders,
+                payment_history: paymentHistory
+            },
+            message: null
+        });
+
+    } catch (e) {
+        console.error("GET PAYMENT ORDERS ERROR:", e);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+}
+
+module.exports = { createOrder, getOrders, cancelOrder, getPaymentOrders };
