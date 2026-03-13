@@ -946,7 +946,7 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
 
 /**
  * @swagger
- * /api/ViewOrders:
+ * /api/Franchise_ViewOrders:
  *   get:
  *     summary: Lấy danh sách đơn hàng của franchise store hiện tại
  *     tags:
@@ -970,48 +970,104 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                     type: object
  *                     properties:
  *                       order_id:
- *                         type: integer
- *                         example: 80
+ *                         type: string
+ *                         example: "92"
  *                       order_code:
  *                         type: string
- *                         example: ORD-1773243947686
+ *                         example: "ORD-1773323847981"
  *                       status:
  *                         type: string
- *                         example: confirmed
+ *                         example: "processing"
  *                       payment_status:
  *                         type: string
- *                         example: unpaid
+ *                         example: "unpaid"
+ *                       paid_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         example: null
  *                       created_at:
  *                         type: string
  *                         format: date-time
- *                         example: "2026-03-11T16:03:09.132Z"
+ *                         example: "2026-03-12T13:58:21.246Z"
  *                       desired_date:
  *                         type: string
- *                         format: date
- *                         example: "2026-03-12"
+ *                         format: date-time
+ *                         example: "2026-03-10T00:00:00.000Z"
  *                       fulfilled_at:
  *                         type: string
  *                         format: date-time
  *                         nullable: true
- *                         example: "2026-03-12T10:00:00.000Z"
+ *                         example: null
  *                       total_amount:
- *                         type: number
- *                         example: 135000
+ *                         type: string
+ *                         example: "960000"
  *                       total_items:
  *                         type: integer
- *                         example: 2
+ *                         example: 1
  *                       total_product_qty:
  *                         type: integer
- *                         example: 15
+ *                         example: 20
  *                       product_names:
  *                         type: string
- *                         example: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - thập cẩm 150g"
+ *                         example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       product_details:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             product_id:
+ *                               type: integer
+ *                               example: 1
+ *                             product_name:
+ *                               type: string
+ *                               example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                             qty:
+ *                               type: integer
+ *                               example: 20
+ *                             unit_price:
+ *                               type: integer
+ *                               example: 48000
+ *                             line_total:
+ *                               type: integer
+ *                               example: 960000
+ *             example:
+ *               success: true
+ *               data:
+ *                 - order_id: "92"
+ *                   order_code: "ORD-1773323847981"
+ *                   status: "processing"
+ *                   payment_status: "unpaid"
+ *                   paid_at: null
+ *                   created_at: "2026-03-12T13:58:21.246Z"
+ *                   desired_date: "2026-03-10T00:00:00.000Z"
+ *                   fulfilled_at: null
+ *                   total_amount: "960000"
+ *                   total_items: 1
+ *                   total_product_qty: 20
+ *                   product_names: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                   product_details:
+ *                     - product_id: 1
+ *                       product_name: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       qty: 20
+ *                       unit_price: 48000
+ *                       line_total: 960000
  *       403:
  *         description: Không có quyền xem đơn
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Không có quyền xem đơn"
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Lỗi server"
  */
-router.get("/ViewOrders", requireAuth, getOrders);
+router.get("/Franchise_ViewOrders", requireAuth, requireFranchiseStaff, getOrders);
 
 /**
  * @swagger
@@ -1927,7 +1983,7 @@ router.get("/manager/inventory", requireAuth, requireRole("manager", "admin"), g
  * /api/Manager_create_products:
  *   post:
  *     summary: Create a new product with materials
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -1999,7 +2055,7 @@ router.post("/Manager_create_products", requireAuth, requireRole("manager", "adm
  * /api/Manager_view_products:
  *   get:
  *     summary: Get all products
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -2017,7 +2073,7 @@ router.get("/Manager_view_products", requireAuth, requireRole("manager", "admin"
  * /api/Manager_view_detail_products/{id}:
  *   get:
  *     summary: Get product detail by ID
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2044,7 +2100,7 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  * /api/Manager_update_products/{id}:
  *   put:
  *     summary: Update product information and materials
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2122,7 +2178,7 @@ router.put("/Manager_update_products/:id", requireAuth, requireRole("manager", "
  * /api/Manager_delete_products/{id}:
  *   delete:
  *     summary: Soft delete product (set is_active = false)
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2149,7 +2205,7 @@ router.delete("/Manager_delete_products/:id", requireAuth, requireRole("manager"
  * /api/Manager_restore_products/{id}:
  *   patch:
  *     summary: Restore soft-deleted product (set is_active = true)
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
