@@ -190,38 +190,53 @@ async function getOrders(req, res) {
 
         const rs = await pool.query(
             `
-    SELECT
-        o.order_id,
-        o.order_code,
-        o.status,
-        'unpaid' AS payment_status,
-        o.created_at,
-        o.desired_date,
-        o.fulfilled_at,
+            SELECT
+                o.order_id,
+                o.order_code,
+                o.status,
+                COALESCE(o.payment_status, 'unpaid') AS payment_status,
+                o.created_at,
+                o.desired_date,
+                o.fulfilled_at,
 
-        COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
-        COUNT(DISTINCT oi.product_id)::int AS total_items,
-        COALESCE(SUM(oi.qty), 0)::int AS total_product_qty,
+                COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
+                COUNT(DISTINCT oi.product_id)::int AS total_items,
+                COALESCE(SUM(oi.qty), 0)::int AS total_product_qty,
 
-        COALESCE(
-            STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
-            ''
-        ) AS product_names
-    FROM orders o
-    LEFT JOIN order_item oi
-        ON oi.order_id = o.order_id
-    LEFT JOIN product p
-        ON p.product_id = oi.product_id
-    WHERE o.franchise_store_id = $1
-    GROUP BY
-        o.order_id,
-        o.order_code,
-        o.status,
-        o.created_at,
-        o.desired_date,
-        o.fulfilled_at
-    ORDER BY o.created_at DESC
-    `,
+                COALESCE(
+                    STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
+                    ''
+                ) AS product_names,
+
+                COALESCE(
+                    JSON_AGG(
+                        JSON_BUILD_OBJECT(
+                            'product_id', oi.product_id,
+                            'product_name', p.name,
+                            'qty', oi.qty,
+                            'unit_price', oi.unit_price,
+                            'line_total', (oi.qty * oi.unit_price)
+                        )
+                        ORDER BY p.name
+                    ) FILTER (WHERE oi.product_id IS NOT NULL),
+                    '[]'::json
+                ) AS product_details
+            FROM orders o
+            LEFT JOIN order_item oi
+                ON oi.order_id = o.order_id
+            LEFT JOIN product p
+                ON p.product_id = oi.product_id
+            WHERE o.franchise_store_id = $1
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.status,
+                o.payment_status,
+                o.created_at,
+                o.desired_date,
+                o.fulfilled_at
+            ORDER BY o.created_at DESC
+            `,
             [req.user.franchise_store_id]
         );
 

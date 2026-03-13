@@ -10,7 +10,6 @@ const { Cdashboard } = require("../controllers/CentralKitchen_dashboardControlle
 const { getOrders } = require("../controllers/orderController.js");
 const CentralKitchen_NewOrder = require("../controllers/CentralKitchen_NewOrder.js");
 const { requireKitchenStaff } = require("../middleware/requireKitchenStaff");
-const CentralKitChenReportController = require("../controllers/CentralKitChenReportController.js");
 const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
@@ -1437,78 +1436,6 @@ router.patch("/profile", requireAuth, profileController.updateProfile);
  *         description: Server error
  */
 router.patch("/profile/change-password", requireAuth, profileController.changePassword);
-
-/**
- * @swagger
- * /api/centralKitchen/report/dashboard:
- *   get:
- *     summary: Central Kitchen - Report Dashboard (cards + pending + low stock)
- *     tags: [Central Kitchen]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: pending_limit
- *         schema:
- *           type: integer
- *           example: 5
- *         description: Số lượng đơn pending trả về
- *       - in: query
- *         name: threshold
- *         schema:
- *           type: number
- *           example: 5
- *         description: Ngưỡng cảnh báo tồn kho (available_qty <= threshold)
- *       - in: query
- *         name: low_stock_limit
- *         schema:
- *           type: integer
- *           example: 5
- *         description: Số lượng cảnh báo tồn kho trả về
- *     responses:
- *       200:
- *         description: OK
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden (not kitchen staff)
- */
-router.get("/centralKitchen/report/dashboard", requireAuth, requireKitchenStaff, CentralKitChenReportController.dashboardReport);
-
-/**
- * @swagger
- * /api/centralKitchen/report/summary:
- *   get:
- *     summary: Central Kitchen - Summary report theo khoảng thời gian
- *     tags: [Central Kitchen]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: from
- *         required: true
- *         schema:
- *           type: string
- *           format: date-time
- *           example: "2026-01-01T00:00:00Z"
- *       - in: query
- *         name: to
- *         required: true
- *         schema:
- *           type: string
- *           format: date-time
- *           example: "2026-02-01T00:00:00Z"
- *     responses:
- *       200:
- *         description: OK
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden (not kitchen staff)
- */
-router.get("/centralKitchen/report/summary", requireAuth, requireKitchenStaff, CentralKitChenReportController.summaryReport);
 
 /**
  * @swagger
