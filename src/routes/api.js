@@ -2220,4 +2220,255 @@ router.delete("/Manager_delete_products/:id", requireAuth, requireRole("manager"
  */
 router.patch("/Manager_restore_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.restoreProduct);
 
+/**
+ * @swagger
+ * tags:
+ *   - name: Admin
+ *     description: Admin user management APIs
+ */
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Lấy danh sách người dùng cho admin
+ *     description: |
+ *       Admin lấy danh sách toàn bộ user trong hệ thống.
+ *       Hỗ trợ:
+ *       - tìm kiếm theo username hoặc email qua `keyword`
+ *       - lọc theo vai trò qua `role`
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: keyword
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Tìm theo username hoặc email
+ *         example: admin
+ *       - in: query
+ *         name: role
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [all, admin, manager, franchise_staff, kitchen_staff]
+ *           default: all
+ *         description: Lọc theo vai trò
+ *         example: franchise_staff
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách user thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AdminUserListResponse'
+ *             examples:
+ *               allUsers:
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     - user_id: 8
+ *                       username: "Nguyen Khanh Lam"
+ *                       email: "storestaff3@moon.com"
+ *                       role: "franchise_staff"
+ *                       role_label: "Cửa Hàng"
+ *                       status: "active"
+ *                       status_label: "Hoạt động"
+ *                       franchise_store_id: 6
+ *                       franchise_store_name: "Chi nhánh Quận 7"
+ *                       central_kitchen_id: null
+ *                       central_kitchen_name: null
+ *                       manager_code: null
+ *                       franchise_staff_code: "FS-STAFF-006"
+ *                       kitchen_staff_code: null
+ *                       created_at: "2026-03-10T21:26:31.257Z"
+ *                       last_login_at: "2026-03-10T22:10:00.000Z"
+ *                   message: null
+ *       401:
+ *         description: Unauthorized - thiếu token hoặc token không hợp lệ
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Server/DB error
+ */
+router.get("/admin/users", requireAuth, requireRole("admin"), adminUserController.listUsers);
+
+/**
+ * @swagger
+ * /api/admin/users/{userId}:
+ *   patch:
+ *     summary: Chỉnh sửa thông tin người dùng
+ *     description: Admin cập nhật username và email của user
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: ID của user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminUpdateUserRequest'
+ *           example:
+ *             username: "Nguyễn Văn A Updated"
+ *             email: "store1_updated@franchise.com"
+ *     responses:
+ *       200:
+ *         description: Cập nhật user thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AdminUpdateUserResponse'
+ *             example:
+ *               success: true
+ *               data:
+ *                 user_id: 5
+ *                 username: "Nguyễn Văn A Updated"
+ *                 email: "store1_updated@franchise.com"
+ *                 status: "active"
+ *                 created_at: "2026-03-10T21:26:31.257Z"
+ *                 last_login_at: null
+ *               message: "Cập nhật user thành công"
+ *       400:
+ *         description: Validation error hoặc email đã tồn tại
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Không tìm thấy user
+ *       500:
+ *         description: Server/DB error
+ */
+router.patch("/admin/users/:userId", requireAuth, requireRole("admin"), adminUserController.updateUser);
+
+/**
+ * @swagger
+ * /api/admin/users/{userId}/reset-password:
+ *   patch:
+ *     summary: Đặt lại mật khẩu người dùng
+ *     description: Admin đặt mật khẩu mới cho user
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: ID của user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminResetPasswordRequest'
+ *           example:
+ *             new_password: "12345678"
+ *     responses:
+ *       200:
+ *         description: Đặt lại mật khẩu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data: null
+ *               message: "Đặt lại mật khẩu thành công"
+ *       400:
+ *         description: Validation error - mật khẩu mới không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Không tìm thấy user
+ *       500:
+ *         description: Server/DB error
+ */
+router.patch("/admin/users/:userId/reset-password", requireAuth, requireRole("admin"), adminUserController.resetPassword);
+
+/**
+ * @swagger
+ * /api/admin/users/{userId}/status:
+ *   patch:
+ *     summary: Vô hiệu hóa hoặc kích hoạt lại người dùng
+ *     description: |
+ *       Admin cập nhật trạng thái tài khoản user.
+ *       - `active`: kích hoạt lại tài khoản
+ *       - `inactive`: vô hiệu hóa tài khoản
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: ID của user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminUpdateStatusRequest'
+ *           examples:
+ *             deactivate:
+ *               summary: Vô hiệu hóa user
+ *               value:
+ *                 status: inactive
+ *             activate:
+ *               summary: Kích hoạt lại user
+ *               value:
+ *                 status: active
+ *     responses:
+ *       200:
+ *         description: Cập nhật trạng thái thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AdminUpdateStatusResponse'
+ *             examples:
+ *               inactive:
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     user_id: 5
+ *                     username: "Nguyễn Văn A"
+ *                     email: "store1@franchise.com"
+ *                     status: "inactive"
+ *                   message: "Vô hiệu hóa tài khoản thành công"
+ *               active:
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     user_id: 5
+ *                     username: "Nguyễn Văn A"
+ *                     email: "store1@franchise.com"
+ *                     status: "active"
+ *                   message: "Kích hoạt tài khoản thành công"
+ *       400:
+ *         description: Validation error hoặc admin tự vô hiệu hóa chính mình
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Không tìm thấy user
+ *       500:
+ *         description: Server/DB error
+ */
+router.patch("/admin/users/:userId/status", requireAuth, requireRole("admin"), adminUserController.updateUserStatus);
+
 module.exports = router;
