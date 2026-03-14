@@ -19,6 +19,7 @@ const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
 const ManagerProductController = require("../controllers/manager_product_controller.js");
 const adminUserController = require("../controllers/adminUserController");
+const manager_accept_payment = require("../controllers/manager_accept_payment");
 
 /**
  * @swagger
@@ -2308,6 +2309,103 @@ router.delete("/Manager_delete_products/:id", requireAuth, requireRole("manager"
  *         description: Server error
  */
 router.patch("/Manager_restore_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.restoreProduct);
+
+/**
+ * @swagger
+ * /api/Manager_comfirmPaymentOrder/orders/{orderId}:
+ *   patch:
+ *     summary: Xác nhận đơn hàng đã thanh toán
+ *     description: Chuyển payment_status từ unpaid sang paid cho đơn hàng đã được xác nhận
+ *     tags:
+ *       - Manager
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         description: ID đơn hàng cần xác nhận thanh toán
+ *         schema:
+ *           type: integer
+ *           example: 57
+ *     responses:
+ *       200:
+ *         description: Xác nhận thanh toán thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Xác nhận thanh toán thành công
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     order_id:
+ *                       type: string
+ *                       example: "57"
+ *                     order_code:
+ *                       type: string
+ *                       example: ORD-1772959916308
+ *                     status:
+ *                       type: string
+ *                       example: confirmed
+ *                     payment_status:
+ *                       type: string
+ *                       example: paid
+ *                     paid_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-03-14T08:10:27.900Z"
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-03-08T08:52:45.560Z"
+ *       400:
+ *         description: orderId không hợp lệ hoặc đơn hàng không đủ điều kiện xác nhận thanh toán
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Đơn không tồn tại, không thuộc cửa hàng của bạn, chưa được xác nhận hoặc đã thanh toán
+ *       403:
+ *         description: Không có quyền xác nhận thanh toán
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Không có quyền xác nhận thanh toán
+ *       500:
+ *         description: Lỗi máy chủ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Server error
+ */
+router.patch("/Manager_comfirmPaymentOrder/orders/:orderId", requireAuth, requireRole("manager", "admin"), manager_accept_payment.confirmPaymentOrder);
 
 /**
  * @swagger
