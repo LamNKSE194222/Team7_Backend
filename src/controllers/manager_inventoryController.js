@@ -6,42 +6,92 @@ async function getManagerStorage(req, res) {
         const allowed = ["manager", "admin"];
 
         if (!allowed.includes(role)) {
-            return res.status(403).json({ success: false, data: null, message: "Forbidden" });
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Forbidden"
+            });
         }
 
-        // Lấy tất cả tồn kho của tất cả franchise stores
-        const rs = await pool.query(
-            `
+        const statsRs = await pool.query(`
             SELECT
-                fii.inventory_item_id,
-                fs.franchise_store_id,
-                fs.name AS store_name,
-                p.product_id,
-                p.sku AS product_code,
-                p.name AS product_name,
-                pt.name AS category_name,
-                ((COALESCE(fii.on_hand_qty,0) - COALESCE(fii.reserved_qty,0))::int) AS quantity,
-                fii.on_hand_qty,
-                fii.reserved_qty,
-                fii.expiry_date,
-                fii.last_updated_at
-            FROM franchise_inventory inv
-            JOIN franchise_inventory_item fii ON fii.inventory_id = inv.inventory_id
-            JOIN franchise_store fs ON fs.franchise_store_id = inv.franchise_store_id
-            JOIN product p ON p.product_id = fii.product_id
-            JOIN product_type pt ON pt.product_type_id = p.product_type_id
-            ORDER BY fs.name ASC, p.sku ASC
-            `
-        );
+                COUNT(*)::int AS total_products,
 
-        return res.json({ success: true, data: rs.rows, message: null });
+                COUNT(*) FILTER (
+                    WHERE ckpii.on_hand_qty < 50
+                )::int AS low_stock,
+
+                COUNT(*) FILTER (
+                    WHERE LOWER(pt.name) = 'bánh nướng'
+                )::int AS baked_mooncake,
+
+                COUNT(*) FILTER (
+                    WHERE LOWER(pt.name) = 'bánh dẻo'
+                )::int AS sticky_mooncake
+
+            FROM central_kitchen_product_inventory_item ckpii
+
+            JOIN central_kitchen ck
+                ON ck.central_kitchen_id = ckpii.central_kitchen_id
+
+            JOIN product p
+                ON p.product_id = ckpii.product_id
+
+            LEFT JOIN product_type pt
+                ON pt.product_type_id = p.product_type_id
+
+            WHERE
+                ck.status = 'active'
+                AND p.is_active = true
+        `);
+
+        const inventoryRs = await pool.query(`
+            SELECT
+                ckpii.inventory_item_id,
+                ck.central_kitchen_id,
+                ck.name AS central_kitchen_name,
+
+                p.product_id,
+                p.name AS product_name,
+                p.uom,
+                p.price,
+                p.description,
+
+                ckpii.on_hand_qty,
+                ckpii.min_qty,
+                ckpii.expiry_date
+
+            FROM central_kitchen_product_inventory_item ckpii
+
+            JOIN central_kitchen ck
+                ON ck.central_kitchen_id = ckpii.central_kitchen_id
+
+            JOIN product p
+                ON p.product_id = ckpii.product_id
+
+            WHERE
+                ck.status = 'active'
+                AND p.is_active = true
+
+            ORDER BY
+                ck.name ASC,
+                p.name ASC
+        `);
+
+        return res.json({
+            success: true,
+            data: { cards: statsRs.rows[0], inventory: inventoryRs.rows },
+            message: null
+        });
+
     } catch (err) {
         console.error("getManagerStorage error:", err);
+
         return res.status(500).json({
             success: false,
             data: null,
             message: "Server/DB error",
-            error_code: "SERVER_ERROR",
+            error_code: "SERVER_ERROR"
         });
     }
 }
