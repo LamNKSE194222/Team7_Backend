@@ -541,6 +541,176 @@ const manager_accept_payment = require("../controllers/manager_accept_payment");
  *                   type: string
  *                   format: date-time
  *                   example: "2026-03-05T09:00:00Z"
+ * 
+ *     AdminUserListItem:
+ *       type: object
+ *       properties:
+ *         user_id:
+ *           type: integer
+ *           example: 8
+ *         username:
+ *           type: string
+ *           example: Nguyen Khanh Lam
+ *         email:
+ *           type: string
+ *           example: storestaff3@moon.com
+ *         role:
+ *           type: string
+ *           example: franchise_staff
+ *         role_label:
+ *           type: string
+ *           example: Cửa Hàng
+ *         status:
+ *           type: string
+ *           example: active
+ *         status_label:
+ *           type: string
+ *           example: Hoạt động
+ *         franchise_store_id:
+ *           type: integer
+ *           nullable: true
+ *           example: 6
+ *         franchise_store_name:
+ *           type: string
+ *           nullable: true
+ *           example: Chi nhánh Quận 7
+ *         central_kitchen_id:
+ *           type: integer
+ *           nullable: true
+ *           example: null
+ *         central_kitchen_name:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         manager_code:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         franchise_staff_code:
+ *           type: string
+ *           nullable: true
+ *           example: FS-STAFF-006
+ *         kitchen_staff_code:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: 2026-03-10T21:26:31.257Z
+ *         last_login_at:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *           example: 2026-03-10T22:10:00.000Z
+ *
+ *     AdminUserListResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/AdminUserListItem'
+ *         message:
+ *           type: string
+ *           nullable: true
+ *           example: null
+ *
+ *     AdminUpdateUserRequest:
+ *       type: object
+ *       required:
+ *         - username
+ *         - email
+ *       properties:
+ *         username:
+ *           type: string
+ *           example: Nguyễn Văn A Updated
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: store1_updated@franchise.com
+ *
+ *     AdminUpdateUserResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           type: object
+ *           properties:
+ *             user_id:
+ *               type: integer
+ *               example: 5
+ *             username:
+ *               type: string
+ *               example: Nguyễn Văn A Updated
+ *             email:
+ *               type: string
+ *               example: store1_updated@franchise.com
+ *             status:
+ *               type: string
+ *               example: active
+ *             created_at:
+ *               type: string
+ *               format: date-time
+ *               example: 2026-03-10T21:26:31.257Z
+ *             last_login_at:
+ *               type: string
+ *               format: date-time
+ *               nullable: true
+ *               example: null
+ *         message:
+ *           type: string
+ *           example: Cập nhật user thành công
+ *
+ *     AdminResetPasswordRequest:
+ *       type: object
+ *       required:
+ *         - new_password
+ *       properties:
+ *         new_password:
+ *           type: string
+ *           minLength: 6
+ *           example: 12345678
+ *
+ *     AdminUpdateStatusRequest:
+ *       type: object
+ *       required:
+ *         - status
+ *       properties:
+ *         status:
+ *           type: string
+ *           enum: [active, inactive]
+ *           example: inactive
+ *
+ *     AdminUpdateStatusResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         data:
+ *           type: object
+ *           properties:
+ *             user_id:
+ *               type: integer
+ *               example: 5
+ *             username:
+ *               type: string
+ *               example: Nguyễn Văn A
+ *             email:
+ *               type: string
+ *               example: store1@franchise.com
+ *             status:
+ *               type: string
+ *               example: inactive
+ *         message:
+ *           type: string
+ *           example: Vô hiệu hóa tài khoản thành công
  */
 
 /**
