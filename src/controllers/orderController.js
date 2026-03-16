@@ -367,26 +367,57 @@ async function getPaymentOrders(req, res) {
 
         const rs = await pool.query(
             `
-            SELECT
-                o.order_id,
-                o.order_code,
-                COALESCE(o.payment_status, 'unpaid') AS payment_status,
-                o.paid_at,
-                o.created_at,
-                COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount
-            FROM orders o
-            LEFT JOIN order_item oi
-                ON oi.order_id = o.order_id
-            WHERE o.franchise_store_id = $1
-              AND COALESCE(o.payment_status, 'unpaid') IN ('unpaid', 'paid')
-            GROUP BY
-                o.order_id,
-                o.order_code,
-                o.payment_status,
-                o.paid_at,
-                o.created_at
-            ORDER BY o.created_at DESC
-            `,
+    SELECT
+        o.order_id,
+        o.order_code,
+        COALESCE(o.payment_status, 'unpaid') AS payment_status,
+        o.paid_at,
+        o.created_at,
+        o.received_confirmed_at AS received_date,
+
+        COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
+
+        COALESCE(
+            STRING_AGG(
+                p.name || ': ' || TRIM(TO_CHAR(oi.qty, 'FM999999999999990')) || ' ' || COALESCE(oi.uom, ''),
+                E'\\n'
+                ORDER BY oi.order_item_id
+            ),
+            ''
+        ) AS product_summary,
+
+        COALESCE(
+            JSON_AGG(
+                JSON_BUILD_OBJECT(
+                    'product_id', p.product_id,
+                    'product_name', p.name,
+                    'qty', TRIM(TO_CHAR(oi.qty, 'FM999999999999990')),
+                    'uom', oi.uom,
+                    'unit_price', oi.unit_price,
+                    'line_total', (oi.qty * oi.unit_price)
+                )
+                ORDER BY oi.order_item_id
+            ) FILTER (WHERE oi.order_item_id IS NOT NULL),
+            '[]'::json
+        ) AS items
+
+    FROM orders o
+    LEFT JOIN order_item oi
+        ON oi.order_id = o.order_id
+    LEFT JOIN product p
+        ON p.product_id = oi.product_id
+    WHERE o.franchise_store_id = $1
+      AND COALESCE(o.payment_status, 'unpaid') IN ('unpaid', 'paid')
+      AND o.received_confirmed_at IS NOT NULL
+    GROUP BY
+        o.order_id,
+        o.order_code,
+        o.payment_status,
+        o.paid_at,
+        o.created_at,
+        o.received_confirmed_at
+    ORDER BY o.created_at DESC
+    `,
             [req.user.franchise_store_id]
         );
 
@@ -395,7 +426,10 @@ async function getPaymentOrders(req, res) {
             .map(row => ({
                 order_id: row.order_id,
                 order_code: row.order_code,
+                products: row.product_summary, // text nhiều dòng để show đúng UI
+                items: row.items,              // FE có thể render từng dòng sản phẩm
                 amount: Number(row.total_amount),
+                received_date: row.received_date,
                 status: "unpaid",
                 status_label: "Chờ Thanh Toán"
             }));
@@ -405,8 +439,11 @@ async function getPaymentOrders(req, res) {
             .map(row => ({
                 order_id: row.order_id,
                 order_code: row.order_code,
+                products: row.product_summary,
+                items: row.items,
                 amount: Number(row.total_amount),
                 paid_at: row.paid_at,
+                received_date: row.received_date,
                 status: "paid",
                 status_label: "Đã Thanh Toán"
             }));
