@@ -58,7 +58,6 @@ exports.readyToDeliver = async (req, res) => {
             UPDATE orders
             SET status = 'fulfilled',
                 fulfilled_at = NOW(),
-                delivery_date = CURRENT_DATE
             WHERE order_id = $1
             `,
             [orderId]
@@ -163,7 +162,6 @@ exports.getFulfilledOrders = async (req, res) => {
                 o.status,
                 o.created_at,
                 o.fulfilled_at,
-                o.delivery_date,
                 o.received_confirmed_at,
                 COUNT(oi.order_item_id) AS total_products,
                 STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names
@@ -185,7 +183,6 @@ exports.getFulfilledOrders = async (req, res) => {
                 o.status,
                 o.created_at,
                 o.fulfilled_at,
-                o.delivery_date,
                 o.received_confirmed_at
             ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC
             `,
