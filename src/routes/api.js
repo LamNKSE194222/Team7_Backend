@@ -10,7 +10,6 @@ const { Cdashboard } = require("../controllers/CentralKitchen_dashboardControlle
 const { getOrders } = require("../controllers/orderController.js");
 const CentralKitchen_NewOrder = require("../controllers/CentralKitchen_NewOrder.js");
 const { requireKitchenStaff } = require("../middleware/requireKitchenStaff");
-const CentralKitChenReportController = require("../controllers/CentralKitChenReportController.js");
 const profileController = require("../controllers/profileController.js");
 const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff");
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
@@ -19,6 +18,10 @@ const receiveConfirmController = require("../controllers/receiveConfirmControlle
 const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../controllers/CentralKitchenOrderStatusController");
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
 const ManagerProductController = require("../controllers/manager_product_controller.js");
+const { Mdashboard } = require("../controllers/manager_dashboardController");
+const { getManagerStorage } = require("../controllers/manager_inventoryController");
+const adminUserController = require("../controllers/adminUserController");
+const manager_accept_payment = require("../controllers/manager_accept_payment");
 
 /**
  * @swagger
@@ -32,8 +35,7 @@ const ManagerProductController = require("../controllers/manager_product_control
  *   - name: Central Kitchen
  *     description: Central Kitchen staff APIs
  */const { requireRole } = require("../middleware/requireRole");
-const { Mdashboard } = require("../controllers/manager_dashboardController");
-const { getManagerStorage } = require("../controllers/manager_inventoryController");
+
 
 
 /**
@@ -697,38 +699,179 @@ router.get("/products", requireAuth, productController.list);
  * /api/franchiseStaff_dashboard:
  *   get:
  *     summary: Franchise staff dashboard
- *     description: Fetch dashboard data for franchise staff
+ *     description: |
+ *       Lấy dữ liệu tổng quan cho cửa hàng franchise hiện tại, bao gồm:
+ *       - tổng tiền đã thanh toán
+ *       - tổng tiền chờ thanh toán
+ *       - tổng số đơn hàng
+ *       - số lượng đơn theo từng trạng thái
+ *       - danh sách đơn hàng gần đây
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Dashboard data
+ *         description: Lấy dashboard thành công
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/BaseResponse'
- *                 - type: object
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
  *                   properties:
- *                     data:
+ *                     summary:
  *                       type: object
  *                       properties:
- *                         cards:
- *                           $ref: '#/components/schemas/DashboardCards'
- *                         pending_orders:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/OrderSummary'
- *                         recent_orders:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/OrderSummary'
- *     401:
- *       description: Unauthorized
+ *                         paid_amount:
+ *                           type: number
+ *                           example: 4000000
+ *                           description: Tổng tiền các đơn đã thanh toán
+ *                         unpaid_amount:
+ *                           type: number
+ *                           example: 8000000
+ *                           description: Tổng tiền các đơn chưa thanh toán
+ *                         total_orders:
+ *                           type: integer
+ *                           example: 3
+ *                           description: Tổng số đơn hàng của cửa hàng
+ *                     cards:
+ *                       type: object
+ *                       properties:
+ *                         pending:
+ *                           type: integer
+ *                           example: 1
+ *                           description: Số đơn chờ xử lý
+ *                         approved:
+ *                           type: integer
+ *                           example: 0
+ *                           description: Số đơn đã chấp nhận
+ *                         processing:
+ *                           type: integer
+ *                           example: 0
+ *                           description: Số đơn đang chuẩn bị
+ *                         fulfilled:
+ *                           type: integer
+ *                           example: 2
+ *                           description: Số đơn sẵn sàng giao
+ *                         confirmed:
+ *                           type: integer
+ *                           example: 1
+ *                           description: Số đơn đã giao và đã xác nhận nhận hàng
+ *                         cancelled:
+ *                           type: integer
+ *                           example: 0
+ *                           description: Số đơn đã hủy
+ *                     recent_orders:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           order_id:
+ *                             type: integer
+ *                             example: 91
+ *                           order_code:
+ *                             type: string
+ *                             example: "ORD-1773278920610"
+ *                           status:
+ *                             type: string
+ *                             example: "confirmed"
+ *                           payment_status:
+ *                             type: string
+ *                             example: "paid"
+ *                             description: |
+ *                               Trạng thái thanh toán của đơn.
+ *                               Ví dụ: unpaid, pending, paid
+ *                           created_at:
+ *                             type: string
+ *                             format: date-time
+ *                             example: "2026-03-12T01:28:40.608Z"
+ *                           desired_date:
+ *                             type: string
+ *                             format: date-time
+ *                             example: "2026-03-12T00:00:00.000Z"
+ *                           fulfilled_at:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *                             example: "2026-03-11T18:29:27.027Z"
+ *                           total_amount:
+ *                             type: number
+ *                             example: 4000000
+ *                             description: Tổng tiền của đơn hàng
+ *                           total_items:
+ *                             type: integer
+ *                             example: 2
+ *                             description: Số loại sản phẩm trong đơn
+ *                           total_product_qty:
+ *                             type: integer
+ *                             example: 15
+ *                             description: Tổng số lượng sản phẩm trong đơn
+ *                           product_names:
+ *                             type: string
+ *                             example: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
+ *                             description: Danh sách tên sản phẩm trong đơn
+ *               example:
+ *                 success: true
+ *                 data:
+ *                   summary:
+ *                     paid_amount: 4000000
+ *                     unpaid_amount: 8000000
+ *                     total_orders: 3
+ *                   cards:
+ *                     pending: 1
+ *                     approved: 0
+ *                     processing: 0
+ *                     fulfilled: 2
+ *                     confirmed: 1
+ *                     cancelled: 0
+ *                   recent_orders:
+ *                     - order_id: 91
+ *                       order_code: "ORD-1773278920610"
+ *                       status: "confirmed"
+ *                       payment_status: "paid"
+ *                       created_at: "2026-03-12T01:28:40.608Z"
+ *                       desired_date: "2026-03-12T00:00:00.000Z"
+ *                       fulfilled_at: "2026-03-11T18:29:27.027Z"
+ *                       total_amount: 4000000
+ *                       total_items: 2
+ *                       total_product_qty: 15
+ *                       product_names: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Không có quyền xem dashboard
+ *       500:
+ *         description: Server error
  */
 router.get("/franchiseStaff_dashboard", requireAuth, requireFranchiseStaff, Fdashboard);
+
+/**
+ * @swagger
+ * /api/franchise/payment-orders:
+ *   get:
+ *     summary: Lấy dữ liệu trang thanh toán đơn hàng
+ *     description: |
+ *       API dùng cho trang Thanh Toán Đơn Hàng của franchise staff.
+ *       Dữ liệu được phân loại theo payment_status:
+ *       - unpaid -> Đơn Hàng Chờ Thanh Toán
+ *       - paid -> Lịch Sử Thanh Toán
+ *
+ *       Trường paid_at là thời gian đã thanh toán của đơn hàng.
+ *       Chỉ xuất hiện trong payment_history.
+ *     tags:
+ *       - Franchise
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy dữ liệu thanh toán thành công
+ */
+router.get("/franchise/payment-orders", requireAuth, requireFranchiseStaff, orderController.getPaymentOrders);
 
 /**
  * @swagger
@@ -805,50 +948,16 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
 
 /**
  * @swagger
- * /api/orders/{orderId}/confirm-receipt:
- *   post:
- *     summary: Xác nhận đã nhận hàng
- *     description: |
- *       Franchise staff xác nhận đã nhận đơn hàng khi đơn ở trạng thái **fulfilled**.
- *       
- *       Khi xác nhận thành công:
- *       - cập nhật trạng thái đơn hàng thành **confirmed**
- *       - lưu thời gian xác nhận nhận hàng
- *       - cộng sản phẩm từ đơn hàng vào kho của franchise store
- *       - có thể lưu rating và comment
+ * /api/Franchise_ViewOrders:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng của franchise store hiện tại
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: orderId
- *         required: true
- *         description: ID của đơn hàng cần xác nhận nhận
- *         schema:
- *           type: integer
- *           example: 80
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - rating
- *             properties:
- *               rating:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 5
- *                 example: 5
- *               comment:
- *                 type: string
- *                 maxLength: 1000
- *                 example: Hàng giao đủ và đúng chất lượng
  *     responses:
  *       200:
- *         description: Xác nhận nhận hàng thành công
+ *         description: Lấy danh sách đơn hàng thành công
  *         content:
  *           application/json:
  *             schema:
@@ -857,40 +966,110 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 message:
- *                   type: string
- *                   example: Đã xác nhận nhận hàng và cộng vào kho franchise
  *                 data:
- *                   type: object
- *                   properties:
- *                     order_id:
- *                       type: string
- *                       example: "80"
- *                     order_code:
- *                       type: string
- *                       example: "ORD-1773243947686"
- *                     status:
- *                       type: string
- *                       example: "confirmed"
- *                     received_confirmed_at:
- *                       type: string
- *                       format: date-time
- *                       example: "2026-03-11T16:03:09.132Z"
- *                     inventory_updated_count:
- *                       type: integer
- *                       example: 1
- *       400:
- *         description: Sai trạng thái đơn hàng hoặc dữ liệu không hợp lệ
- *       401:
- *         description: Unauthorized - Chưa đăng nhập
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       order_id:
+ *                         type: string
+ *                         example: "92"
+ *                       order_code:
+ *                         type: string
+ *                         example: "ORD-1773323847981"
+ *                       status:
+ *                         type: string
+ *                         example: "processing"
+ *                       payment_status:
+ *                         type: string
+ *                         example: "unpaid"
+ *                       paid_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         example: null
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-12T13:58:21.246Z"
+ *                       desired_date:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-10T00:00:00.000Z"
+ *                       fulfilled_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         example: null
+ *                       total_amount:
+ *                         type: string
+ *                         example: "960000"
+ *                       total_items:
+ *                         type: integer
+ *                         example: 1
+ *                       total_product_qty:
+ *                         type: integer
+ *                         example: 20
+ *                       product_names:
+ *                         type: string
+ *                         example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       product_details:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             product_id:
+ *                               type: integer
+ *                               example: 1
+ *                             product_name:
+ *                               type: string
+ *                               example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                             qty:
+ *                               type: integer
+ *                               example: 20
+ *                             unit_price:
+ *                               type: integer
+ *                               example: 48000
+ *                             line_total:
+ *                               type: integer
+ *                               example: 960000
+ *             example:
+ *               success: true
+ *               data:
+ *                 - order_id: "92"
+ *                   order_code: "ORD-1773323847981"
+ *                   status: "processing"
+ *                   payment_status: "unpaid"
+ *                   paid_at: null
+ *                   created_at: "2026-03-12T13:58:21.246Z"
+ *                   desired_date: "2026-03-10T00:00:00.000Z"
+ *                   fulfilled_at: null
+ *                   total_amount: "960000"
+ *                   total_items: 1
+ *                   total_product_qty: 20
+ *                   product_names: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                   product_details:
+ *                     - product_id: 1
+ *                       product_name: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       qty: 20
+ *                       unit_price: 48000
+ *                       line_total: 960000
  *       403:
- *         description: Không có quyền với đơn hàng này
- *       404:
- *         description: Không tìm thấy đơn hàng
+ *         description: Không có quyền xem đơn
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Không có quyền xem đơn"
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: "Lỗi server"
  */
-router.get("/ViewOrders", requireAuth, getOrders);
+router.get("/Franchise_ViewOrders", requireAuth, requireFranchiseStaff, getOrders);
 
 /**
  * @swagger
@@ -937,6 +1116,96 @@ router.get("/ViewOrders", requireAuth, getOrders);
  *         description: Forbidden
  */
 router.post("/orders", requireAuth, requireFranchiseStaff, orderController.createOrder);
+
+/**
+ * @swagger
+ * /api/orders/{orderId}:
+ *   delete:
+ *     summary: Hủy/Xóa đơn hàng của franchise
+ *     description: |
+ *       Franchise staff được phép xóa đơn hàng của chính cửa hàng mình.
+ *       Chỉ cho phép xóa khi đơn đang ở trạng thái **pending**.
+ *       Khi xóa thành công, dữ liệu trong `order_item` và `orders` sẽ bị xóa khỏi hệ thống.
+ *     tags:
+ *       - Franchise
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         description: ID của đơn hàng cần xóa
+ *         schema:
+ *           type: integer
+ *           example: 93
+ *     responses:
+ *       200:
+ *         description: Xóa đơn hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Hủy đơn hàng thành công
+ *       400:
+ *         description: orderId không hợp lệ hoặc trạng thái đơn không cho phép xóa
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: orderId không hợp lệ
+ *       403:
+ *         description: Không có quyền xóa đơn hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Không có quyền hủy đơn
+ *       404:
+ *         description: Không tìm thấy đơn hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Không tìm thấy đơn hàng
+ *       500:
+ *         description: Lỗi server khi xóa đơn hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Lỗi server khi hủy đơn hàng
+ */
+router.delete("/orders/:orderId", requireAuth, requireFranchiseStaff, orderController.cancelOrder);
 
 /**
  * @swagger
@@ -1225,78 +1494,6 @@ router.patch("/profile", requireAuth, profileController.updateProfile);
  *         description: Server error
  */
 router.patch("/profile/change-password", requireAuth, profileController.changePassword);
-
-/**
- * @swagger
- * /api/centralKitchen/report/dashboard:
- *   get:
- *     summary: Central Kitchen - Report Dashboard (cards + pending + low stock)
- *     tags: [Central Kitchen]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: pending_limit
- *         schema:
- *           type: integer
- *           example: 5
- *         description: Số lượng đơn pending trả về
- *       - in: query
- *         name: threshold
- *         schema:
- *           type: number
- *           example: 5
- *         description: Ngưỡng cảnh báo tồn kho (available_qty <= threshold)
- *       - in: query
- *         name: low_stock_limit
- *         schema:
- *           type: integer
- *           example: 5
- *         description: Số lượng cảnh báo tồn kho trả về
- *     responses:
- *       200:
- *         description: OK
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden (not kitchen staff)
- */
-router.get("/centralKitchen/report/dashboard", requireAuth, requireKitchenStaff, CentralKitChenReportController.dashboardReport);
-
-/**
- * @swagger
- * /api/centralKitchen/report/summary:
- *   get:
- *     summary: Central Kitchen - Summary report theo khoảng thời gian
- *     tags: [Central Kitchen]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: from
- *         required: true
- *         schema:
- *           type: string
- *           format: date-time
- *           example: "2026-01-01T00:00:00Z"
- *       - in: query
- *         name: to
- *         required: true
- *         schema:
- *           type: string
- *           format: date-time
- *           example: "2026-02-01T00:00:00Z"
- *     responses:
- *       200:
- *         description: OK
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden (not kitchen staff)
- */
-router.get("/centralKitchen/report/summary", requireAuth, requireKitchenStaff, CentralKitChenReportController.summaryReport);
 
 /**
  * @swagger
@@ -1772,7 +1969,7 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
 
 /**
  * @swagger
- * /api/manager/inventory:
+ * /api/manager/product_inventory:
  *   get:
  *     summary: Manager Inventory Overview (System-wide storage)
  *     tags: [Manager]
@@ -1781,14 +1978,14 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
  *       200:
  *         description: OK
  */
-router.get("/manager/inventory", requireAuth, requireRole("manager", "admin"), getManagerStorage);
+router.get("/manager/product_inventory", requireAuth, requireRole("manager", "admin"), getManagerStorage);
 
 /**
  * @swagger
  * /api/Manager_create_products:
  *   post:
  *     summary: Create a new product with materials
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -1860,7 +2057,7 @@ router.post("/Manager_create_products", requireAuth, requireRole("manager", "adm
  * /api/Manager_view_products:
  *   get:
  *     summary: Get all products
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1878,7 +2075,7 @@ router.get("/Manager_view_products", requireAuth, requireRole("manager", "admin"
  * /api/Manager_view_detail_products/{id}:
  *   get:
  *     summary: Get product detail by ID
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1905,7 +2102,7 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  * /api/Manager_update_products/{id}:
  *   put:
  *     summary: Update product information and materials
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1983,7 +2180,7 @@ router.put("/Manager_update_products/:id", requireAuth, requireRole("manager", "
  * /api/Manager_delete_products/{id}:
  *   delete:
  *     summary: Soft delete product (set is_active = false)
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2010,7 +2207,7 @@ router.delete("/Manager_delete_products/:id", requireAuth, requireRole("manager"
  * /api/Manager_restore_products/{id}:
  *   patch:
  *     summary: Restore soft-deleted product (set is_active = true)
- *     tags: [Manager Products]
+ *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -2031,5 +2228,353 @@ router.delete("/Manager_delete_products/:id", requireAuth, requireRole("manager"
  *         description: Server error
  */
 router.patch("/Manager_restore_products/:id", requireAuth, requireRole("manager", "admin"), ManagerProductController.restoreProduct);
+
+/**
+ * @swagger
+ * /api/Manager_comfirmPaymentOrder/orders/{orderId}:
+ *   patch:
+ *     summary: Xác nhận đơn hàng đã thanh toán
+ *     description: Chuyển payment_status từ unpaid sang paid cho đơn hàng đã được xác nhận
+ *     tags:
+ *       - Manager
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         description: ID đơn hàng cần xác nhận thanh toán
+ *         schema:
+ *           type: integer
+ *           example: 57
+ *     responses:
+ *       200:
+ *         description: Xác nhận thanh toán thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Xác nhận thanh toán thành công
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     order_id:
+ *                       type: string
+ *                       example: "57"
+ *                     order_code:
+ *                       type: string
+ *                       example: ORD-1772959916308
+ *                     status:
+ *                       type: string
+ *                       example: confirmed
+ *                     payment_status:
+ *                       type: string
+ *                       example: paid
+ *                     paid_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-03-14T08:10:27.900Z"
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-03-08T08:52:45.560Z"
+ *       400:
+ *         description: orderId không hợp lệ hoặc đơn hàng không đủ điều kiện xác nhận thanh toán
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Đơn không tồn tại, không thuộc cửa hàng của bạn, chưa được xác nhận hoặc đã thanh toán
+ *       403:
+ *         description: Không có quyền xác nhận thanh toán
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Không có quyền xác nhận thanh toán
+ *       500:
+ *         description: Lỗi máy chủ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Server error
+ */
+router.patch("/Manager_comfirmPaymentOrder/orders/:orderId", requireAuth, requireRole("manager", "admin"), manager_accept_payment.confirmPaymentOrder);
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Admin
+ *     description: Admin user management APIs
+ */
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Lấy danh sách người dùng cho admin
+ *     description: |
+ *       Admin lấy danh sách toàn bộ user trong hệ thống.
+ *       Hỗ trợ:
+ *       - tìm kiếm theo username hoặc email qua `keyword`
+ *       - lọc theo vai trò qua `role`
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: keyword
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Tìm theo username hoặc email
+ *         example: admin
+ *       - in: query
+ *         name: role
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [all, admin, manager, franchise_staff, kitchen_staff]
+ *           default: all
+ *         description: Lọc theo vai trò
+ *         example: franchise_staff
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách user thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AdminUserListResponse'
+ *             examples:
+ *               allUsers:
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     - user_id: 8
+ *                       username: "Nguyen Khanh Lam"
+ *                       email: "storestaff3@moon.com"
+ *                       role: "franchise_staff"
+ *                       role_label: "Cửa Hàng"
+ *                       status: "active"
+ *                       status_label: "Hoạt động"
+ *                       franchise_store_id: 6
+ *                       franchise_store_name: "Chi nhánh Quận 7"
+ *                       central_kitchen_id: null
+ *                       central_kitchen_name: null
+ *                       manager_code: null
+ *                       franchise_staff_code: "FS-STAFF-006"
+ *                       kitchen_staff_code: null
+ *                       created_at: "2026-03-10T21:26:31.257Z"
+ *                       last_login_at: "2026-03-10T22:10:00.000Z"
+ *                   message: null
+ *       401:
+ *         description: Unauthorized - thiếu token hoặc token không hợp lệ
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Server/DB error
+ */
+router.get("/admin/users", requireAuth, requireRole("admin"), adminUserController.listUsers);
+
+/**
+ * @swagger
+ * /api/admin/users/{userId}:
+ *   patch:
+ *     summary: Chỉnh sửa thông tin người dùng
+ *     description: Admin cập nhật username và email của user
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: ID của user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminUpdateUserRequest'
+ *           example:
+ *             username: "Nguyễn Văn A Updated"
+ *             email: "store1_updated@franchise.com"
+ *     responses:
+ *       200:
+ *         description: Cập nhật user thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AdminUpdateUserResponse'
+ *             example:
+ *               success: true
+ *               data:
+ *                 user_id: 5
+ *                 username: "Nguyễn Văn A Updated"
+ *                 email: "store1_updated@franchise.com"
+ *                 status: "active"
+ *                 created_at: "2026-03-10T21:26:31.257Z"
+ *                 last_login_at: null
+ *               message: "Cập nhật user thành công"
+ *       400:
+ *         description: Validation error hoặc email đã tồn tại
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Không tìm thấy user
+ *       500:
+ *         description: Server/DB error
+ */
+router.patch("/admin/users/:userId", requireAuth, requireRole("admin"), adminUserController.updateUser);
+
+/**
+ * @swagger
+ * /api/admin/users/{userId}/reset-password:
+ *   patch:
+ *     summary: Đặt lại mật khẩu người dùng
+ *     description: Admin đặt mật khẩu mới cho user
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: ID của user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminResetPasswordRequest'
+ *           example:
+ *             new_password: "12345678"
+ *     responses:
+ *       200:
+ *         description: Đặt lại mật khẩu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data: null
+ *               message: "Đặt lại mật khẩu thành công"
+ *       400:
+ *         description: Validation error - mật khẩu mới không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Không tìm thấy user
+ *       500:
+ *         description: Server/DB error
+ */
+router.patch("/admin/users/:userId/reset-password", requireAuth, requireRole("admin"), adminUserController.resetPassword);
+
+/**
+ * @swagger
+ * /api/admin/users/{userId}/status:
+ *   patch:
+ *     summary: Vô hiệu hóa hoặc kích hoạt lại người dùng
+ *     description: |
+ *       Admin cập nhật trạng thái tài khoản user.
+ *       - `active`: kích hoạt lại tài khoản
+ *       - `inactive`: vô hiệu hóa tài khoản
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: ID của user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminUpdateStatusRequest'
+ *           examples:
+ *             deactivate:
+ *               summary: Vô hiệu hóa user
+ *               value:
+ *                 status: inactive
+ *             activate:
+ *               summary: Kích hoạt lại user
+ *               value:
+ *                 status: active
+ *     responses:
+ *       200:
+ *         description: Cập nhật trạng thái thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AdminUpdateStatusResponse'
+ *             examples:
+ *               inactive:
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     user_id: 5
+ *                     username: "Nguyễn Văn A"
+ *                     email: "store1@franchise.com"
+ *                     status: "inactive"
+ *                   message: "Vô hiệu hóa tài khoản thành công"
+ *               active:
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     user_id: 5
+ *                     username: "Nguyễn Văn A"
+ *                     email: "store1@franchise.com"
+ *                     status: "active"
+ *                   message: "Kích hoạt tài khoản thành công"
+ *       400:
+ *         description: Validation error hoặc admin tự vô hiệu hóa chính mình
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Không tìm thấy user
+ *       500:
+ *         description: Server/DB error
+ */
+router.patch("/admin/users/:userId/status", requireAuth, requireRole("admin"), adminUserController.updateUserStatus);
 
 module.exports = router;

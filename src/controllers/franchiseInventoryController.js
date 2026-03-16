@@ -12,7 +12,7 @@ async function getStorage(req, res) {
                 p.name AS product_name,
                 pt.name AS product_type_name,
                 fii.on_hand_qty AS quantity,
-                fii.expiry_date
+                ckii.expiry_date
             FROM franchise_inventory inv
             JOIN franchise_inventory_item fii
                 ON fii.inventory_id = inv.inventory_id
@@ -20,6 +20,8 @@ async function getStorage(req, res) {
                 ON p.product_id = fii.product_id
             LEFT JOIN product_type pt
                 ON pt.product_type_id = p.product_type_id
+            LEFT JOIN central_kitchen_product_inventory_item ckii
+                ON ckii.product_id = p.product_id
             WHERE inv.franchise_store_id = $1
             ORDER BY pt.name ASC NULLS LAST, p.name ASC
             `,
