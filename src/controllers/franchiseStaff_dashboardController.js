@@ -74,6 +74,12 @@ async function Fdashboard(req, res) {
         );
 
         // 4) Đơn gần đây
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const offset = (page - 1) * limit;
+
+        // Đơn gần đây + số sản phẩm + ngày giao
         const recentRs = await pool.query(
             `
             SELECT
@@ -107,9 +113,9 @@ async function Fdashboard(req, res) {
                 o.desired_date,
                 o.fulfilled_at
             ORDER BY o.created_at DESC
-            LIMIT 5
+            LIMIT $2 OFFSET $3
             `,
-            [storeId]
+            [storeId, limit, offset]
         );
 
         return res.json({

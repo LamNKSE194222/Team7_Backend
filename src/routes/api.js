@@ -18,6 +18,8 @@ const receiveConfirmController = require("../controllers/receiveConfirmControlle
 const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../controllers/CentralKitchenOrderStatusController");
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
 const ManagerProductController = require("../controllers/manager_product_controller.js");
+const { Mdashboard } = require("../controllers/manager_dashboardController");
+const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
 const manager_accept_payment = require("../controllers/manager_accept_payment");
 
@@ -32,10 +34,8 @@ const manager_accept_payment = require("../controllers/manager_accept_payment");
  *     description: Franchise staff APIs
  *   - name: Central Kitchen
  *     description: Central Kitchen staff APIs
- */
-const { requireRole } = require("../middleware/requireRole");
-const { Mdashboard } = require("../controllers/manager_dashboardController");
-const { getManagerStorage, getManagerStorage_material } = require("../controllers/manager_inventoryController");
+ */const { requireRole } = require("../middleware/requireRole");
+
 
 
 /**
@@ -2149,88 +2149,6 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
  *         description: OK
  */
 router.get("/manager/product_inventory", requireAuth, requireRole("manager", "admin"), getManagerStorage);
-
-/**
- * @swagger
- * /api/manager/material_inventory:
- *   get:
- *     summary: Lấy danh sách tồn kho nguyên liệu của central kitchen
- *     tags:
- *       - Manager
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lấy danh sách tồn kho nguyên liệu thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       inventory_item_id:
- *                         type: string
- *                         example: "1"
- *                       central_kitchen_id:
- *                         type: string
- *                         example: "2"
- *                       central_kitchen_name:
- *                         type: string
- *                         example: "Central Kitchen - Thu Duc"
- *                       material_id:
- *                         type: string
- *                         example: "1"
- *                       material_code:
- *                         type: string
- *                         example: "BTT001"
- *                       material_name:
- *                         type: string
- *                         example: "Bột mì đa dụng"
- *                       category_name:
- *                         type: string
- *                         example: "Bột"
- *                       quantity:
- *                         type: integer
- *                         example: 413
- *                       on_hand_qty:
- *                         type: string
- *                         example: "413"
- *                       last_updated_at:
- *                         type: string
- *                         format: date-time
- *                         example: "2026-03-08T09:00:23.650Z"
- *                 message:
- *                   type: string
- *                   nullable: true
- *                   example: null
- *       500:
- *         description: Lỗi server hoặc database
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 data:
- *                   nullable: true
- *                   example: null
- *                 message:
- *                   type: string
- *                   example: Server/DB error
- *                 error_code:
- *                   type: string
- *                   example: SERVER_ERROR
- */
-router.get("/manager/material_inventory", requireAuth, requireRole("manager", "admin"), getManagerStorage_material);
 
 /**
  * @swagger
