@@ -15,7 +15,7 @@ const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff")
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
-const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../controllers/CentralKitchenOrderStatusController");
+const { readyToDeliver, getFulfilledOrders, getProcessingOrders, CentralGetOrders } = require("../controllers/CentralKitchenOrderStatusController");
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
 const ManagerProductController = require("../controllers/manager_product_controller.js");
 const { Mdashboard } = require("../controllers/manager_dashboardController");
@@ -1540,44 +1540,124 @@ router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitch
 
 /**
  * @swagger
- * /api/centralKitchen/orders/{orderId}/reject:
- *   post:
- *     summary: Từ chối đơn (pending -> cancelled)
- *     tags: [Central Kitchen]
+ * /api/centralKitchen/View_orders:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng của central kitchen
+ *     description: |
+ *       API dùng để lấy danh sách đơn hàng thuộc central kitchen đang đăng nhập.
+ *       Kết quả trả về bao gồm thông tin đơn hàng, chi nhánh franchise đặt đơn,
+ *       tổng tiền, tổng số lượng sản phẩm và danh sách chi tiết sản phẩm trong từng đơn.
+ *     tags:
+ *       - Central Kitchen
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: orderId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [reason]
- *             properties:
- *               reason:
- *                 type: string
- *                 minLength: 3
- *                 example: "Không đủ nguyên liệu"
  *     responses:
  *       200:
- *         description: OK
- *       400:
- *         description: Bad Request
+ *         description: Lấy danh sách đơn hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       order_id:
+ *                         type: string
+ *                         example: "92"
+ *                       order_code:
+ *                         type: string
+ *                         example: "ORD-1773323847981"
+ *                       status:
+ *                         type: string
+ *                         example: "processing"
+ *                       payment_status:
+ *                         type: string
+ *                         example: "unpaid"
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-12T13:58:21.246Z"
+ *                       desired_date:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-10T00:00:00.000Z"
+ *                       fulfilled_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         example: null
+ *                       franchise_store_id:
+ *                         type: string
+ *                         example: "1"
+ *                       franchise_store_name:
+ *                         type: string
+ *                         example: "Chi nhánh Quận 1"
+ *                       total_amount:
+ *                         type: string
+ *                         example: "960000"
+ *                       total_items:
+ *                         type: integer
+ *                         example: 1
+ *                       total_product_qty:
+ *                         type: integer
+ *                         example: 20
+ *                       product_names:
+ *                         type: string
+ *                         example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       product_details:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             product_id:
+ *                               type: integer
+ *                               example: 1
+ *                             product_name:
+ *                               type: string
+ *                               example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                             qty:
+ *                               type: integer
+ *                               example: 20
+ *                             unit_price:
+ *                               type: integer
+ *                               example: 48000
+ *                             line_total:
+ *                               type: integer
+ *                               example: 960000
  *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       409:
- *         description: Conflict
+ *         description: Không có token hoặc token không hợp lệ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Unauthorized
+ *       500:
+ *         description: Lỗi server khi lấy danh sách đơn hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Server error
  */
-router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.rejectNewOrder);
+router.get("/centralKitchen/View_orders", requireAuth, requireKitchenStaff, CentralGetOrders);
 
 /**
  * @swagger
