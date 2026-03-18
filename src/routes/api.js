@@ -2154,7 +2154,8 @@ router.get("/manager/product_inventory", requireAuth, requireRole("manager", "ad
  * @swagger
  * /api/Manager_create_products:
  *   post:
- *     summary: Create a new product with materials
+ *     summary: Tạo sản phẩm mới
+ *     description: API tạo sản phẩm mới. SKU sẽ được hệ thống tự động sinh, người dùng không cần nhập.
  *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
@@ -2168,7 +2169,6 @@ router.get("/manager/product_inventory", requireAuth, requireRole("manager", "ad
  *               - product_type_id
  *               - name
  *               - uom
- *               - sku
  *               - price
  *             properties:
  *               product_type_id:
@@ -2176,19 +2176,17 @@ router.get("/manager/product_inventory", requireAuth, requireRole("manager", "ad
  *                 example: 1
  *               name:
  *                 type: string
- *                 example: Bánh Trung Thu - Đậu Xanh 150g
+ *                 example: Bánh Trung Thu Đậu vàng 150g
  *               uom:
  *                 type: string
  *                 example: cái
- *               sku:
- *                 type: string
- *                 example: SKU-MC-MUNG-150
  *               price:
  *                 type: number
- *                 example: 45000
+ *                 format: float
+ *                 example: 48000
  *               description:
  *                 type: string
- *                 example: Bánh trung thu nhân đậu xanh truyền thống
+ *                 example: Bánh trung thu nhân đậu vàng
  *               materials:
  *                 type: array
  *                 items:
@@ -2203,22 +2201,112 @@ router.get("/manager/product_inventory", requireAuth, requireRole("manager", "ad
  *                       example: 1
  *                     qty_required:
  *                       type: number
- *                       example: 0.05
+ *                       format: float
+ *                       example: 0.2
  *                     uom:
  *                       type: string
  *                       example: kg
  *                     note:
  *                       type: string
- *                       example: Bột mì làm vỏ bánh
+ *                       example: Bột mì
+ *           example:
+ *             product_type_id: 1
+ *             name: Bánh Trung Thu Đậu vàng 150g
+ *             uom: cái
+ *             price: 48000
+ *             description: Bánh trung thu nhân đậu vàng
+ *             materials:
+ *               - material_id: 1
+ *                 qty_required: 0.2
+ *                 uom: kg
+ *                 note: Bột mì
+ *               - material_id: 2
+ *                 qty_required: 0.1
+ *                 uom: kg
+ *                 note: Đậu vàng
  *     responses:
  *       201:
- *         description: Product created successfully
+ *         description: Tạo sản phẩm thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Tạo sản phẩm thành công
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     product_id:
+ *                       type: string
+ *                       example: "11"
+ *                     product_type_id:
+ *                       type: string
+ *                       example: "1"
+ *                     name:
+ *                       type: string
+ *                       example: Bánh Trung Thu Đậu vàng 150g
+ *                     uom:
+ *                       type: string
+ *                       example: cái
+ *                     sku:
+ *                       type: string
+ *                       example: SKU-000010
+ *                     price:
+ *                       type: string
+ *                       example: "48000.00"
+ *                     description:
+ *                       type: string
+ *                       example: Bánh trung thu nhân đậu vàng
+ *                     is_active:
+ *                       type: boolean
+ *                       example: true
  *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
+ *         description: Dữ liệu đầu vào không hợp lệ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: product_type_id, name, uom, price là bắt buộc
+ *       403:
+ *         description: Không có quyền tạo sản phẩm
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: Forbidden
  *       500:
- *         description: Server error
+ *         description: Lỗi server khi tạo sản phẩm
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Lỗi server khi tạo sản phẩm
  */
 router.post("/Manager_create_products", requireAuth, requireRole("manager", "admin"), ManagerProductController.createProduct);
 

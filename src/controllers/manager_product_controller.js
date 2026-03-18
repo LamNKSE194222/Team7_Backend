@@ -1,44 +1,61 @@
 const pool = require("../config/database");
 
+async function generateUniqueProductSku(client) {
+    const rs = await client.query(`
+        SELECT COALESCE(MAX(product_id), 0) + 1 AS next_id
+        FROM product
+    `);
+
+    const nextId = Number(rs.rows[0].next_id);
+    return `SKU-${String(nextId).padStart(6, "0")}`;
+}
 
 async function createProduct(req, res) {
-    const client = await pool.connect();
+    let client;
 
     try {
         const role = req.user?.role;
         const allowed = ["manager", "admin"];
 
         if (!allowed.includes(role)) {
-            return res.status(403).json({ success: false, data: null, message: "Forbidden" });
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Forbidden"
+            });
         }
 
         const {
             product_type_id,
             name,
             uom,
-            sku,
             price,
             description,
             materials = []
         } = req.body || {};
 
-        if (!product_type_id || !name || !uom || !sku || price == null) {
+        // Bỏ sku khỏi validate vì sku sẽ tự sinh
+        if (!product_type_id || !name || !uom || price == null) {
             return res.status(400).json({
                 success: false,
-                message: "product_type_id, name, uom, sku, price là bắt buộc"
+                message: "product_type_id, name, uom, price là bắt buộc"
             });
         }
 
+        client = await pool.connect();
         await client.query("BEGIN");
+
+        // Tự động tạo SKU
+        const sku = await generateUniqueProductSku(client);
 
         const productResult = await client.query(
             `
-      INSERT INTO product (
-        product_type_id, name, uom, sku, price, description, is_active
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-      RETURNING *;
-      `,
+            INSERT INTO product (
+                product_type_id, name, uom, sku, price, description, is_active
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+            RETURNING *;
+            `,
             [product_type_id, name, uom, sku, price, description || null]
         );
 
@@ -46,7 +63,12 @@ async function createProduct(req, res) {
 
         if (materials.length > 0) {
             for (const item of materials) {
-                const { material_id, qty_required, uom: material_uom, note } = item;
+                const {
+                    material_id,
+                    qty_required,
+                    uom: material_uom,
+                    note
+                } = item;
 
                 if (!material_id || !qty_required || qty_required <= 0 || !material_uom) {
                     await client.query("ROLLBACK");
@@ -58,12 +80,18 @@ async function createProduct(req, res) {
 
                 await client.query(
                     `
-          INSERT INTO product_material (
-            product_id, material_id, qty_required, uom, note
-          )
-          VALUES ($1, $2, $3, $4, $5)
-          `,
-                    [product.product_id, material_id, qty_required, material_uom, note || null]
+                    INSERT INTO product_material (
+                        product_id, material_id, qty_required, uom, note
+                    )
+                    VALUES ($1, $2, $3, $4, $5)
+                    `,
+                    [
+                        product.product_id,
+                        material_id,
+                        qty_required,
+                        material_uom,
+                        note || null
+                    ]
                 );
             }
         }
@@ -76,14 +104,27 @@ async function createProduct(req, res) {
             data: product
         });
     } catch (error) {
-        await client.query("ROLLBACK");
-        console.error("CREATE PRODUCT ERROR:", error);
+        if (client) {
+            try {
+                await client.query("ROLLBACK");
+            } catch (rollbackError) {
+                console.error("ROLLBACK ERROR:", rollbackError);
+            }
+        }
+
+        console.error("CREATE PRODUCT ERROR:", {
+            message: error.message,
+            code: error.code,
+            detail: error.detail,
+            constraint: error.constraint
+        });
+
         return res.status(500).json({
             success: false,
-            message: "Lỗi server khi tạo sản phẩm"
+            message: error.message || "Lỗi server khi tạo sản phẩm"
         });
     } finally {
-        client.release();
+        if (client) client.release();
     }
 }
 
