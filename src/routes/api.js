@@ -875,11 +875,28 @@ router.get("/products", requireAuth, productController.list);
  *       - tổng tiền chờ thanh toán
  *       - tổng số đơn hàng
  *       - số lượng đơn theo từng trạng thái
- *       - danh sách đơn hàng gần đây
+ *       - danh sách đơn hàng gần đây có phân trang
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Trang hiện tại của danh sách đơn gần đây
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 5
+ *           minimum: 1
+ *         description: Số lượng đơn hàng mỗi trang
  *     responses:
  *       200:
  *         description: Lấy dashboard thành công
@@ -907,7 +924,7 @@ router.get("/products", requireAuth, productController.list);
  *                           description: Tổng tiền các đơn chưa thanh toán
  *                         total_orders:
  *                           type: integer
- *                           example: 3
+ *                           example: 36
  *                           description: Tổng số đơn hàng của cửa hàng
  *                     cards:
  *                       type: object
@@ -915,108 +932,94 @@ router.get("/products", requireAuth, productController.list);
  *                         pending:
  *                           type: integer
  *                           example: 1
- *                           description: Số đơn chờ xử lý
  *                         approved:
  *                           type: integer
  *                           example: 0
- *                           description: Số đơn đã chấp nhận
  *                         processing:
  *                           type: integer
- *                           example: 0
- *                           description: Số đơn đang chuẩn bị
+ *                           example: 5
  *                         fulfilled:
  *                           type: integer
- *                           example: 2
- *                           description: Số đơn sẵn sàng giao
+ *                           example: 4
  *                         confirmed:
  *                           type: integer
- *                           example: 1
- *                           description: Số đơn đã giao và đã xác nhận nhận hàng
+ *                           example: 20
  *                         cancelled:
  *                           type: integer
- *                           example: 0
- *                           description: Số đơn đã hủy
- *                     recent_orders:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           order_id:
- *                             type: integer
- *                             example: 91
- *                           order_code:
- *                             type: string
- *                             example: "ORD-1773278920610"
- *                           status:
- *                             type: string
- *                             example: "confirmed"
- *                           payment_status:
- *                             type: string
- *                             example: "paid"
- *                             description: |
- *                               Trạng thái thanh toán của đơn.
- *                               Ví dụ: unpaid, pending, paid
- *                           created_at:
- *                             type: string
- *                             format: date-time
- *                             example: "2026-03-12T01:28:40.608Z"
- *                           desired_date:
- *                             type: string
- *                             format: date-time
- *                             example: "2026-03-12T00:00:00.000Z"
- *                           fulfilled_at:
- *                             type: string
- *                             format: date-time
- *                             nullable: true
- *                             example: "2026-03-11T18:29:27.027Z"
- *                           total_amount:
- *                             type: number
- *                             example: 4000000
- *                             description: Tổng tiền của đơn hàng
- *                           total_items:
- *                             type: integer
- *                             example: 2
- *                             description: Số loại sản phẩm trong đơn
- *                           total_product_qty:
- *                             type: integer
- *                             example: 15
- *                             description: Tổng số lượng sản phẩm trong đơn
- *                           product_names:
- *                             type: string
- *                             example: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
- *                             description: Danh sách tên sản phẩm trong đơn
- *               example:
- *                 success: true
- *                 data:
- *                   summary:
- *                     paid_amount: 4000000
- *                     unpaid_amount: 8000000
- *                     total_orders: 3
- *                   cards:
- *                     pending: 1
- *                     approved: 0
- *                     processing: 0
- *                     fulfilled: 2
- *                     confirmed: 1
- *                     cancelled: 0
- *                   recent_orders:
- *                     - order_id: 91
- *                       order_code: "ORD-1773278920610"
- *                       status: "confirmed"
- *                       payment_status: "paid"
- *                       created_at: "2026-03-12T01:28:40.608Z"
- *                       desired_date: "2026-03-12T00:00:00.000Z"
- *                       fulfilled_at: "2026-03-11T18:29:27.027Z"
- *                       total_amount: 4000000
- *                       total_items: 2
- *                       total_product_qty: 15
- *                       product_names: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
+ *                           example: 6
+ *                     
+ *             example:
+ *               success: true
+ *               data:
+ *                 summary:
+ *                   paid_amount: 4000000
+ *                   unpaid_amount: 8000000
+ *                   total_orders: 36
+ *                 cards:
+ *                   pending: 1
+ *                   approved: 0
+ *                   processing: 5
+ *                   fulfilled: 4
+ *                   confirmed: 20
+ *                   cancelled: 6
+ *                 pagination:
+ *                   page: 1
+ *                   limit: 5
+ *                   total_items: 36
+ *                   total_pages: 8
+ *                   has_next_page: true
+ *                   has_prev_page: false
+ *                 recent_orders:
+ *                   - order_id: 91
+ *                     order_code: "ORD-1773278920610"
+ *                     status: "confirmed"
+ *                     payment_status: "paid"
+ *                     created_at: "2026-03-12T01:28:40.608Z"
+ *                     desired_date: "2026-03-12T00:00:00.000Z"
+ *                     fulfilled_at: "2026-03-11T18:29:27.027Z"
+ *                     total_amount: 4000000
+ *                     total_items: 2
+ *                     total_product_qty: 15
+ *                     product_names: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
+ *                   - order_id: 92
+ *                     order_code: "ORD-1773323847981"
+ *                     status: "processing"
+ *                     payment_status: "unpaid"
+ *                     created_at: "2026-03-12T13:58:21.246Z"
+ *                     desired_date: "2026-03-10T00:00:00.000Z"
+ *                     fulfilled_at: null
+ *                     total_amount: 960000
+ *                     total_items: 1
+ *                     total_product_qty: 20
+ *                     product_names: "Bánh Trung Thu - Đậu Xanh 150g"
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Không có quyền xem dashboard
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Không có quyền xem dashboard"
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Server error"
  */
 router.get("/franchiseStaff_dashboard", requireAuth, requireFranchiseStaff, Fdashboard);
 
