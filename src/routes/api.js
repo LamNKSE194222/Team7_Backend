@@ -1124,10 +1124,38 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  * /api/Franchise_ViewOrders:
  *   get:
  *     summary: Lấy danh sách đơn hàng của franchise store hiện tại
+ *     description: |
+ *       Lấy danh sách đơn hàng của cửa hàng franchise hiện tại, có hỗ trợ phân trang.
+ *       Kết quả bao gồm:
+ *       - thông tin cơ bản của đơn hàng
+ *       - trạng thái đơn
+ *       - trạng thái thanh toán
+ *       - tổng tiền
+ *       - số loại sản phẩm
+ *       - tổng số lượng sản phẩm
+ *       - danh sách tên sản phẩm
+ *       - chi tiết từng sản phẩm trong đơn
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Trang hiện tại
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           minimum: 1
+ *         description: Số lượng đơn hàng mỗi trang
  *     responses:
  *       200:
  *         description: Lấy danh sách đơn hàng thành công
@@ -1145,22 +1173,19 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                     type: object
  *                     properties:
  *                       order_id:
- *                         type: string
- *                         example: "92"
+ *                         type: integer
+ *                         example: 92
  *                       order_code:
  *                         type: string
  *                         example: "ORD-1773323847981"
  *                       status:
  *                         type: string
  *                         example: "processing"
+ *                         description: Trạng thái đơn hàng
  *                       payment_status:
  *                         type: string
  *                         example: "unpaid"
- *                       paid_at:
- *                         type: string
- *                         format: date-time
- *                         nullable: true
- *                         example: null
+ *                         description: Trạng thái thanh toán
  *                       created_at:
  *                         type: string
  *                         format: date-time
@@ -1168,6 +1193,7 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                       desired_date:
  *                         type: string
  *                         format: date-time
+ *                         nullable: true
  *                         example: "2026-03-10T00:00:00.000Z"
  *                       fulfilled_at:
  *                         type: string
@@ -1175,19 +1201,24 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                         nullable: true
  *                         example: null
  *                       total_amount:
- *                         type: string
- *                         example: "960000"
+ *                         type: number
+ *                         example: 960000
+ *                         description: Tổng tiền đơn hàng
  *                       total_items:
  *                         type: integer
  *                         example: 1
+ *                         description: Số loại sản phẩm trong đơn
  *                       total_product_qty:
  *                         type: integer
  *                         example: 20
+ *                         description: Tổng số lượng sản phẩm trong đơn
  *                       product_names:
  *                         type: string
  *                         example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                         description: Danh sách tên sản phẩm trong đơn
  *                       product_details:
  *                         type: array
+ *                         description: Danh sách chi tiết sản phẩm trong đơn
  *                         items:
  *                           type: object
  *                           properties:
@@ -1206,18 +1237,39 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                             line_total:
  *                               type: integer
  *                               example: 960000
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *                     total_items:
+ *                       type: integer
+ *                       example: 36
+ *                       description: Tổng số đơn hàng
+ *                     total_pages:
+ *                       type: integer
+ *                       example: 4
+ *                     has_next_page:
+ *                       type: boolean
+ *                       example: true
+ *                     has_prev_page:
+ *                       type: boolean
+ *                       example: false
  *             example:
  *               success: true
  *               data:
- *                 - order_id: "92"
+ *                 - order_id: 92
  *                   order_code: "ORD-1773323847981"
  *                   status: "processing"
  *                   payment_status: "unpaid"
- *                   paid_at: null
  *                   created_at: "2026-03-12T13:58:21.246Z"
  *                   desired_date: "2026-03-10T00:00:00.000Z"
  *                   fulfilled_at: null
- *                   total_amount: "960000"
+ *                   total_amount: 960000
  *                   total_items: 1
  *                   total_product_qty: 20
  *                   product_names: "Bánh Trung Thu - Đậu Xanh 150g"
@@ -1227,20 +1279,45 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                       qty: 20
  *                       unit_price: 48000
  *                       line_total: 960000
+ *               pagination:
+ *                 page: 1
+ *                 limit: 10
+ *                 total_items: 36
+ *                 total_pages: 4
+ *                 has_next_page: true
+ *                 has_prev_page: false
  *       403:
  *         description: Không có quyền xem đơn
  *         content:
  *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Không có quyền xem đơn hàng"
  *             example:
  *               success: false
- *               message: "Không có quyền xem đơn"
+ *               message: "Không có quyền xem đơn hàng"
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Server error"
  *             example:
  *               success: false
- *               message: "Lỗi server"
+ *               message: "Server error"
  */
 router.get("/Franchise_ViewOrders", requireAuth, requireFranchiseStaff, getOrders);
 

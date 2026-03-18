@@ -187,6 +187,28 @@ async function createOrder(req, res) {
 
 async function getOrders(req, res) {
     try {
+        if (!req.user?.franchise_store_id) {
+            return res.status(403).json({
+                success: false,
+                message: "Không có quyền xem danh sách đơn hàng"
+            });
+        }
+
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.max(parseInt(req.query.limit) || 10, 1);
+        const offset = (page - 1) * limit;
+
+        const countRs = await pool.query(
+            `
+            SELECT COUNT(*)::int AS total_items
+            FROM orders o
+            WHERE o.franchise_store_id = $1
+            `,
+            [req.user.franchise_store_id]
+        );
+
+        const totalItems = Number(countRs.rows[0]?.total_items || 0);
+        const totalPages = Math.ceil(totalItems / limit);
 
         const rs = await pool.query(
             `
@@ -236,13 +258,27 @@ async function getOrders(req, res) {
                 o.desired_date,
                 o.fulfilled_at
             ORDER BY o.created_at DESC
+            LIMIT $2 OFFSET $3
             `,
-            [req.user.franchise_store_id]
+            [req.user.franchise_store_id, limit, offset]
         );
 
         return res.json({
             success: true,
-            data: rs.rows
+            data: rs.rows.map(row => ({
+                ...row,
+                total_amount: Number(row.total_amount),
+                total_items: Number(row.total_items),
+                total_product_qty: Number(row.total_product_qty)
+            })),
+            pagination: {
+                page,
+                limit,
+                total_items: totalItems,
+                total_pages: totalPages,
+                has_next_page: page < totalPages,
+                has_prev_page: page > 1
+            }
         });
 
     } catch (e) {
@@ -254,7 +290,6 @@ async function getOrders(req, res) {
         });
     }
 }
-
 async function cancelOrder(req, res) {
     const client = await pool.connect();
 
