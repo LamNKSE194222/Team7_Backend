@@ -1290,7 +1290,7 @@ router.post("/orders", requireAuth, requireFranchiseStaff, orderController.creat
 /**
  * @swagger
  * /api/orders/{orderId}:
- *   delete:
+ *   patch:
  *     summary: Hủy/Xóa đơn hàng của franchise
  *     description: |
  *       Franchise staff được phép xóa đơn hàng của chính cửa hàng mình.
@@ -1375,7 +1375,7 @@ router.post("/orders", requireAuth, requireFranchiseStaff, orderController.creat
  *                   type: string
  *                   example: Lỗi server khi hủy đơn hàng
  */
-router.delete("/orders/:orderId", requireAuth, requireFranchiseStaff, orderController.cancelOrder);
+router.patch("/orders/:orderId", requireAuth, requireFranchiseStaff, orderController.cancelOrder);
 
 /**
  * @swagger
