@@ -1,24 +1,82 @@
 const pool = require("../config/database");
 
-async function getOrder(client, orderId) {
-    const rs = await client.query(
-        `
-        SELECT *
-        FROM orders
-        WHERE order_id = $1
-        FOR UPDATE
-        `,
-        [orderId]
-    );
+async function CentralGetOrders(req, res) {
+    try {
+        const rs = await pool.query(
+            `
+            SELECT
+                o.order_id,
+                o.order_code,
+                o.status,
+                COALESCE(o.payment_status, 'unpaid') AS payment_status,
+                o.created_at,
+                o.desired_date,
+                o.fulfilled_at,
 
-    if (rs.rowCount === 0) {
-        return null;
+                fs.franchise_store_id,
+                fs.name AS franchise_store_name,
+
+                COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
+                COUNT(DISTINCT oi.product_id)::int AS total_items,
+                COALESCE(SUM(oi.qty), 0)::int AS total_product_qty,
+
+                COALESCE(
+                    STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
+                    ''
+                ) AS product_names,
+
+                COALESCE(
+                    JSON_AGG(
+                        JSON_BUILD_OBJECT(
+                            'product_id', oi.product_id,
+                            'product_name', p.name,
+                            'qty', oi.qty,
+                            'unit_price', oi.unit_price,
+                            'line_total', (oi.qty * oi.unit_price)
+                        )
+                        ORDER BY p.name
+                    ) FILTER (WHERE oi.product_id IS NOT NULL),
+                    '[]'::json
+                ) AS product_details
+            FROM orders o
+            LEFT JOIN franchise_store fs
+                ON fs.franchise_store_id = o.franchise_store_id
+            LEFT JOIN order_item oi
+                ON oi.order_id = o.order_id
+            LEFT JOIN product p
+                ON p.product_id = oi.product_id
+            WHERE o.central_Kitchen_id = $1
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.status,
+                o.payment_status,
+                o.created_at,
+                o.desired_date,
+                o.fulfilled_at,
+                fs.franchise_store_id,
+                fs.name
+            ORDER BY o.created_at DESC
+            `,
+            [req.user.central_kitchen_id]
+        );
+
+        return res.json({
+            success: true,
+            data: rs.rows
+        });
+
+    } catch (e) {
+        console.error("GET ORDERS ERROR:", e);
+
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
     }
-
-    return rs.rows[0];
 }
 
-exports.readyToDeliver = async (req, res) => {
+async function readyToDeliver(req, res) {
     const { orderId } = req.params;
     const kitchenId = req.user.central_kitchen_id;
 
@@ -49,7 +107,7 @@ exports.readyToDeliver = async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(400).json({
                 success: false,
-                message: "Đơn hàng phải ở trạng thái processing trước",
+                message: "Đơn hàng phải xử lý trước",
             });
         }
 
@@ -57,7 +115,7 @@ exports.readyToDeliver = async (req, res) => {
             `
             UPDATE orders
             SET status = 'fulfilled',
-                fulfilled_at = NOW(),
+                fulfilled_at = NOW()
             WHERE order_id = $1
             `,
             [orderId]
@@ -67,11 +125,12 @@ exports.readyToDeliver = async (req, res) => {
 
         return res.json({
             success: true,
-            message: "Đã cập nhật đơn hàng sang trạng thái sẵn sàng giao",
+            message: "Đã xong, sẵn sàng giao hàng",
         });
+
     } catch (err) {
         await client.query("ROLLBACK");
-        console.error("readyToDeliver error:", err);
+        console.error(err);
 
         return res.status(500).json({
             success: false,
@@ -80,9 +139,9 @@ exports.readyToDeliver = async (req, res) => {
     } finally {
         client.release();
     }
-};
+}
 
-exports.delivered = async (req, res) => {
+async function delivered(req, res) {
     const { orderId } = req.params;
     const kitchenId = req.user.central_kitchen_id;
 
@@ -105,7 +164,7 @@ exports.delivered = async (req, res) => {
             await client.query("ROLLBACK");
             return res.status(403).json({
                 success: false,
-                message: "Bạn không thể xử lý đơn hàng này",
+                message: "You cannot process this order",
             });
         }
 
@@ -121,7 +180,7 @@ exports.delivered = async (req, res) => {
             `
             UPDATE orders
             SET status = 'confirmed',
-                delivered_at = NOW()
+                confirmed_at = NOW()
             WHERE order_id = $1
             `,
             [orderId]
@@ -133,9 +192,10 @@ exports.delivered = async (req, res) => {
             success: true,
             message: "Order confirmed successfully",
         });
+
     } catch (err) {
         await client.query("ROLLBACK");
-        console.error("delivered error:", err);
+        console.error(err);
 
         return res.status(500).json({
             success: false,
@@ -144,9 +204,9 @@ exports.delivered = async (req, res) => {
     } finally {
         client.release();
     }
-};
+}
 
-exports.getFulfilledOrders = async (req, res) => {
+async function getFulfilledOrders(req, res) {
     const kitchenId = req.user.central_kitchen_id;
     const client = await pool.connect();
 
@@ -156,35 +216,22 @@ exports.getFulfilledOrders = async (req, res) => {
             SELECT
                 o.order_id,
                 o.order_code,
-                o.franchise_store_id,
-                fs.name AS store_name,
-                o.central_kitchen_id,
                 o.status,
-                o.created_at,
                 o.fulfilled_at,
-                o.received_confirmed_at,
-                COUNT(oi.order_item_id) AS total_products,
-                STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names
+                o.franchise_store_id,
+                oi.product_id,
+                p.name AS product_name,
+                oi.qty,
+                oi.uom,
+                oi.unit_price
             FROM orders o
-            LEFT JOIN franchise_store fs
-                ON fs.franchise_store_id = o.franchise_store_id
-            LEFT JOIN order_item oi
+            JOIN order_item oi
                 ON oi.order_id = o.order_id
-            LEFT JOIN product p
+            JOIN product p
                 ON p.product_id = oi.product_id
             WHERE o.central_kitchen_id = $1
               AND o.status = 'fulfilled'
-            GROUP BY
-                o.order_id,
-                o.order_code,
-                o.franchise_store_id,
-                fs.name,
-                o.central_kitchen_id,
-                o.status,
-                o.created_at,
-                o.fulfilled_at,
-                o.received_confirmed_at
-            ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC
+            ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC, oi.order_item_id ASC
             `,
             [kitchenId]
         );
@@ -195,7 +242,7 @@ exports.getFulfilledOrders = async (req, res) => {
             message: null,
         });
     } catch (err) {
-        console.error("getFulfilledOrders error:", err);
+        console.error(err);
         return res.status(500).json({
             success: false,
             data: null,
@@ -204,9 +251,9 @@ exports.getFulfilledOrders = async (req, res) => {
     } finally {
         client.release();
     }
-};
+}
 
-exports.getProcessingOrders = async (req, res) => {
+async function getProcessingOrders(req, res) {
     const kitchenId = req.user.central_kitchen_id;
     const client = await pool.connect();
 
@@ -253,7 +300,7 @@ exports.getProcessingOrders = async (req, res) => {
             message: null,
         });
     } catch (err) {
-        console.error("getProcessingOrders error:", err);
+        console.error(err);
         return res.status(500).json({
             success: false,
             data: null,
@@ -262,4 +309,12 @@ exports.getProcessingOrders = async (req, res) => {
     } finally {
         client.release();
     }
+}
+
+module.exports = {
+    CentralGetOrders,
+    readyToDeliver,
+    delivered,
+    getFulfilledOrders,
+    getProcessingOrders,
 };
