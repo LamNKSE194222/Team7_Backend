@@ -278,7 +278,7 @@ async function cancelOrder(req, res) {
 
         await client.query("BEGIN");
 
-        // Khóa dòng đơn hàng để tránh bị update đồng thời
+        // Khóa dòng đơn hàng để tránh update đồng thời
         const orderRs = await client.query(
             `
             SELECT
@@ -312,25 +312,20 @@ async function cancelOrder(req, res) {
             });
         }
 
+        // Chỉ cho hủy khi đang pending
         if (order.status !== "pending") {
             await client.query("ROLLBACK");
             return res.status(400).json({
                 success: false,
-                message: `Chỉ được xóa đơn khi trạng thái là pending. Hiện tại: ${order.status}`
+                message: `Chỉ được hủy đơn khi trạng thái là pending. Hiện tại: ${order.status}`
             });
         }
 
+        // Xóa mềm: chỉ cập nhật trạng thái
         await client.query(
             `
-            DELETE FROM order_item
-            WHERE order_id = $1
-            `,
-            [orderId]
-        );
-
-        await client.query(
-            `
-            DELETE FROM orders
+            UPDATE orders
+            SET status = 'cancelled'
             WHERE order_id = $1
             `,
             [orderId]
@@ -367,12 +362,12 @@ async function getPaymentOrders(req, res) {
 
         const rs = await pool.query(
             `
-    SELECT
-        o.order_id,
-        o.order_code,
-        COALESCE(o.payment_status, 'unpaid') AS payment_status,
-        o.paid_at,
-        o.created_at,
+            SELECT
+                o.order_id,
+                o.order_code,
+                COALESCE(o.payment_status, 'unpaid') AS payment_status,
+                o.paid_at,
+                o.created_at,
         o.received_confirmed_at AS received_date,
 
         COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
@@ -401,23 +396,23 @@ async function getPaymentOrders(req, res) {
             '[]'::json
         ) AS items
 
-    FROM orders o
-    LEFT JOIN order_item oi
-        ON oi.order_id = o.order_id
+            FROM orders o
+            LEFT JOIN order_item oi
+                ON oi.order_id = o.order_id
     LEFT JOIN product p
         ON p.product_id = oi.product_id
-    WHERE o.franchise_store_id = $1
-      AND COALESCE(o.payment_status, 'unpaid') IN ('unpaid', 'paid')
+            WHERE o.franchise_store_id = $1
+              AND COALESCE(o.payment_status, 'unpaid') IN ('unpaid', 'paid')
       AND o.received_confirmed_at IS NOT NULL
-    GROUP BY
-        o.order_id,
-        o.order_code,
-        o.payment_status,
-        o.paid_at,
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.payment_status,
+                o.paid_at,
         o.created_at,
         o.received_confirmed_at
-    ORDER BY o.created_at DESC
-    `,
+            ORDER BY o.created_at DESC
+            `,
             [req.user.franchise_store_id]
         );
 
@@ -426,10 +421,7 @@ async function getPaymentOrders(req, res) {
             .map(row => ({
                 order_id: row.order_id,
                 order_code: row.order_code,
-                products: row.product_summary, // text nhiều dòng để show đúng UI
-                items: row.items,              // FE có thể render từng dòng sản phẩm
                 amount: Number(row.total_amount),
-                received_date: row.received_date,
                 status: "unpaid",
                 status_label: "Chờ Thanh Toán"
             }));
@@ -439,11 +431,8 @@ async function getPaymentOrders(req, res) {
             .map(row => ({
                 order_id: row.order_id,
                 order_code: row.order_code,
-                products: row.product_summary,
-                items: row.items,
                 amount: Number(row.total_amount),
                 paid_at: row.paid_at,
-                received_date: row.received_date,
                 status: "paid",
                 status_label: "Đã Thanh Toán"
             }));
