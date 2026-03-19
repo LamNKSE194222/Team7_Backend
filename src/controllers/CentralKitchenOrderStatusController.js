@@ -85,7 +85,17 @@ async function readyToDeliver(req, res) {
     try {
         await client.query("BEGIN");
 
-        const order = await getOrder(client, orderId);
+        const orderResult = await client.query(
+            `
+            SELECT order_id, central_kitchen_id, status
+            FROM orders
+            WHERE order_id = $1
+            FOR UPDATE
+            `,
+            [orderId]
+        );
+
+        const order = orderResult.rows[0];
 
         if (!order) {
             await client.query("ROLLBACK");
@@ -107,7 +117,7 @@ async function readyToDeliver(req, res) {
             await client.query("ROLLBACK");
             return res.status(400).json({
                 success: false,
-                message: "Đơn hàng phải xử lý trước",
+                message: "Đơn hàng phải ở trạng thái processing trước",
             });
         }
 
