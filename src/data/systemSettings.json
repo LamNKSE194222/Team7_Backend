@@ -1,0 +1,22 @@
+{
+  "company_name": "Bánh Trung Thu Anh Lâm",
+  "timezone": "string",
+  "currency": "string",
+  "notifications": {
+    "low_stock_alert": true,
+    "order_status_change_alert": true,
+    "expiry_alert": true
+  },
+  "email_config": {
+    "smtp_host": "string",
+    "smtp_port": 0,
+    "smtp_user": "string",
+    "smtp_password": "string",
+    "from_email": "string"
+  },
+  "security": {
+    "two_factor_auth": true,
+    "auto_logout": true,
+    "session_timeout_minutes": 0
+  }
+}
