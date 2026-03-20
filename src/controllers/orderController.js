@@ -213,6 +213,7 @@ async function getOrders(req, res) {
                         JSON_BUILD_OBJECT(
                             'product_id', oi.product_id,
                             'product_name', p.name,
+                            'uom', p.uom,
                             'qty', oi.qty,
                             'unit_price', oi.unit_price,
                             'line_total', (oi.qty * oi.unit_price)

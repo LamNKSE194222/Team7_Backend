@@ -121,7 +121,7 @@ exports.delivered = async (req, res) => {
             `
             UPDATE orders
             SET status = 'confirmed',
-                delivered_at = NOW()
+                confirmed_at = NOW()
             WHERE order_id = $1
             `,
             [orderId]
@@ -164,7 +164,8 @@ exports.getFulfilledOrders = async (req, res) => {
                 o.fulfilled_at,
                 o.received_confirmed_at,
                 COUNT(oi.order_item_id) AS total_products,
-                STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names
+                STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names,
+                STRING_AGG(p.uom, ', ' ORDER BY p.name) AS product_uoms
             FROM orders o
             LEFT JOIN franchise_store fs
                 ON fs.franchise_store_id = o.franchise_store_id

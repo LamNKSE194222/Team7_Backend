@@ -1194,6 +1194,9 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                             product_name:
  *                               type: string
  *                               example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                             uom:
+ *                               type: string
+ *                               example: "cái"
  *                             qty:
  *                               type: integer
  *                               example: 20
@@ -1221,6 +1224,7 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                   product_details:
  *                     - product_id: 1
  *                       product_name: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       uom: "cái"
  *                       qty: 20
  *                       unit_price: 48000
  *                       line_total: 960000
