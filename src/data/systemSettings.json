@@ -1,5 +1,5 @@
 {
-  "company_name": "Bánh Trung Thu Anh Lâm",
+  "company_name": "string",
   "timezone": "string",
   "currency": "string",
   "notifications": {
@@ -8,11 +8,11 @@
     "expiry_alert": true
   },
   "email_config": {
-    "smtp_host": "string",
+    "smtp_host": "8000",
     "smtp_port": 0,
     "smtp_user": "string",
     "smtp_password": "string",
-    "from_email": "string"
+    "from_email": "admin1@gmail.com"
   },
   "security": {
     "two_factor_auth": true,

@@ -2300,7 +2300,7 @@ router.get("/admin/system_settings", requireAuth, requireRole("admin"), systemSe
 
 /**
  * @swagger
- * /api/admin/system_settings:
+ * /api/admin/system_settings/update:
  *   put:
  *     summary: Cập nhật cài đặt hệ thống
  *     tags: [Admin]
@@ -2362,7 +2362,7 @@ router.get("/admin/system_settings", requireAuth, requireRole("admin"), systemSe
  *       500:
  *         description: Server error
  */
-router.put("/admin/system_settings", requireAuth, requireRole("admin"), systemSettingsController.updateSystemSettings);
+router.put("/admin/system_settings/update", requireAuth, requireRole("admin"), systemSettingsController.updateSystemSettings);
 
 /**
  * @swagger
@@ -3214,5 +3214,125 @@ router.patch("/admin/franchise_stores/:store_id/status", requireAuth, requireRol
  *         description: Server/DB error
  */
 router.get("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCentralKitchenManager.getAllCentralKitchens);
+
+/**
+ * @swagger
+ * /admin/central_kitchens/{kitchen_id}:
+ *   put:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Cập nhật thông tin bếp trung tâm
+ *     description: API này sẽ cập nhật thông tin bếp trung tâm theo kitchen_id.
+ *     parameters:
+ *       - in: path
+ *         name: kitchen_id
+ *         required: true
+ *         description: ID bếp trung tâm cần cập nhật
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               kitchen_code:
+ *                 type: string
+ *                 description: Mã bếp trung tâm
+ *                 example: "CK-001"
+ *               kitchen_name:
+ *                 type: string
+ *                 description: Tên bếp trung tâm
+ *                 example: "Central Kitchen - Thu Duc"
+ *               kitchen_address:
+ *                 type: string
+ *                 description: Địa chỉ bếp trung tâm
+ *                 example: "100 Lý Thường Kiệt, Quận 10"
+ *               kitchen_phone:
+ *                 type: string
+ *                 description: Số điện thoại bếp trung tâm
+ *                 example: "028-5555-1234"
+ *               kitchen_email:
+ *                 type: string
+ *                 description: Email bếp trung tâm
+ *                 example: "kitchen@franchise.com"
+ *               production_capacity:
+ *                 type: integer
+ *                 description: Công suất sản xuất (số đơn vị/ngày)
+ *                 example: 500
+ *               staff_count:
+ *                 type: integer
+ *                 description: Số lượng nhân sự
+ *                 example: 12
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 central_kitchen_id: 1
+ *                 kitchen_code: "CK-001"
+ *                 kitchen_name: "Central Kitchen - Thu Duc"
+ *                 kitchen_status: "active"
+ *                 kitchen_address: "100 Lý Thường Kiệt, Quận 10"
+ *                 kitchen_phone: "028-5555-1234"
+ *                 kitchen_email: "kitchen@franchise.com"
+ *                 production_capacity: 500
+ *                 staff_count: 12
+ *               message: "Cập nhật bếp trung tâm thành công"
+ *       400:
+ *         description: Thông tin gửi lên không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Bếp trung tâm không tồn tại
+ *       500:
+ *         description: Lỗi server
+ */
+router.put("/admin/central_kitchens/:kitchen_id", requireAuth, requireRole("admin"), adminCentralKitchenManager.updateCentralKitchen);
+
+/**
+ * @swagger
+ * /admin/central_kitchens/{kitchen_id}/status:
+ *   patch:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Cập nhật trạng thái bếp trung tâm
+ *     parameters:
+ *       - in: path
+ *         name: kitchen_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID bếp trung tâm
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *     responses:
+ *       200:
+ *         description: Cập nhật trạng thái thành công
+ *       404:
+ *         description: Không tìm thấy bếp trung tâm
+ *       500:
+ *         description: Server error
+ */
+router.patch("/admin/central_kitchens/:kitchen_id/status", requireAuth, requireRole("admin"), adminCentralKitchenManager.updateStatus);
 
 module.exports = router;
