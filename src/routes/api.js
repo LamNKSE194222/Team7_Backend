@@ -22,6 +22,7 @@ const { Mdashboard } = require("../controllers/manager_dashboardController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
 const manager_accept_payment = require("../controllers/manager_accept_payment");
+const adminStoreManager = require('../controllers/adminStoreManager');
 
 /**
  * @swagger
@@ -35,8 +36,6 @@ const manager_accept_payment = require("../controllers/manager_accept_payment");
  *   - name: Central Kitchen
  *     description: Central Kitchen staff APIs
  */const { requireRole } = require("../middleware/requireRole");
-
-
 
 /**
  * @swagger
@@ -2826,5 +2825,210 @@ router.patch("/admin/users/:userId/reset-password", requireAuth, requireRole("ad
  *         description: Server/DB error
  */
 router.patch("/admin/users/:userId/status", requireAuth, requireRole("admin"), adminUserController.updateUserStatus);
+
+/**
+ * @swagger
+ * /admin/franchise_stores:
+ *   get:
+ *     tags:
+ *       - Admin
+ *     summary: Lấy danh sách tất cả các cửa hàng franchise
+ *     description: API này sẽ trả về tất cả các cửa hàng franchise có trong hệ thống.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Thành công, trả về danh sách cửa hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       franchise_store_id:
+ *                         type: integer
+ *                         description: ID của cửa hàng franchise
+ *                         example: 1
+ *                       store_code:
+ *                         type: string
+ *                         description: Mã cửa hàng
+ *                         example: "FS-001"
+ *                       name:
+ *                         type: string
+ *                         description: Tên cửa hàng
+ *                         example: "Chi Nhánh Quận 1"
+ *                       status:
+ *                         type: string
+ *                         description: Trạng thái của cửa hàng
+ *                         example: "active"
+ *                       address:
+ *                         type: string
+ *                         description: Địa chỉ cửa hàng
+ *                         example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                       phone:
+ *                         type: string
+ *                         description: Số điện thoại cửa hàng
+ *                         example: "028-1234-5678"
+ *                       email:
+ *                         type: string
+ *                         description: Email của cửa hàng
+ *                         example: "store1@franchise.com"
+ *                       manager_name:
+ *                         type: string
+ *                         description: Tên người quản lý cửa hàng
+ *                         example: "Nguyễn Văn A"
+ *       401:
+ *         description: Không có quyền truy cập
+ *       500:
+ *         description: Lỗi server
+ */
+router.get("/admin/franchise_stores", requireAuth, requireRole("admin"), adminStoreManager.getAllFranchiseStores);
+
+/**
+ * @swagger
+ * /admin/franchise_stores/{store_id}:
+ *   put:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: [Admin Token]
+ *     summary: Cập nhật thông tin cửa hàng franchise
+ *     description: API này sẽ cập nhật thông tin của cửa hàng dựa trên store_id.
+ *     parameters:
+ *       - in: path
+ *         name: store_id
+ *         required: true
+ *         description: ID cửa hàng cần cập nhật
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               store_code:
+ *                 type: string
+ *                 description: Mã cửa hàng
+ *                 example: "FS-001"
+ *               store_name:
+ *                 type: string
+ *                 description: Tên cửa hàng
+ *                 example: "Chi Nhánh Quận 1"
+ *               store_address:
+ *                 type: string
+ *                 description: Địa chỉ cửa hàng
+ *                 example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *               store_phone:
+ *                 type: string
+ *                 description: Số điện thoại cửa hàng
+ *                 example: "028-1234-5678"
+ *               store_email:
+ *                 type: string
+ *                 description: Email của cửa hàng
+ *                 example: "store1@franchise.com"
+ *               manager_name:
+ *                 type: string
+ *                 description: Tên người quản lý cửa hàng
+ *                 example: "Nguyễn Văn A"
+ *     responses:
+ *       200:
+ *         description: Thành công, trả về thông tin cửa hàng đã cập nhật
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 franchise_store_id: 1
+ *                 store_code: "FS-001"
+ *                 name: "Chi Nhánh Quận 1"
+ *                 status: "active"
+ *                 address: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                 phone: "028-1234-5678"
+ *                 email: "store1@franchise.com"
+ *                 manager_name: "Nguyễn Văn A"
+ *               message: "Cập nhật cửa hàng thành công"
+ *       400:
+ *         description: Thông tin gửi lên không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Cửa hàng không tồn tại
+ *       500:
+ *         description: Lỗi server
+ */
+router.put("/admin/franchise_stores/:store_id", requireAuth, requireRole("admin"), adminStoreManager.updateFranchiseStore);
+
+/**
+ * @swagger
+ * /admin/franchise_stores/{store_id}/status:
+ *   patch:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: [Admin Token]
+ *     summary: Cập nhật trạng thái cửa hàng franchise
+ *     description: API này sẽ cập nhật trạng thái tại một cửa hàng franchise (active/inactive).
+ *     parameters:
+ *       - in: path
+ *         name: store_id
+ *         required: true
+ *         description: ID của cửa hàng franchise cần cập nhật trạng thái
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *                 example: inactive
+ *     responses:
+ *       200:
+ *         description: Cập nhật trạng thái thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 franchise_store_id: 1
+ *                 store_code: "FS-001"
+ *                 name: "Chi Nhánh Quận 1"
+ *                 status: "inactive"
+ *                 address: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                 phone: "028-1234-5678"
+ *                 email: "store1@franchise.com"
+ *                 manager_name: "Nguyễn Văn A"
+ *               message: "Cập nhật trạng thái cửa hàng thành công."
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Cửa hàng không tồn tại
+ *       500:
+ *         description: Server/DB error
+ */
+router.patch("/admin/franchise_stores/:store_id/status", requireAuth, requireRole("admin"), adminStoreManager.updateStatus);
 
 module.exports = router;
