@@ -19,10 +19,12 @@ const { readyToDeliver, getFulfilledOrders, getProcessingOrders, CentralGetOrder
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
 const ManagerProductController = require("../controllers/manager_product_controller.js");
 const { Mdashboard } = require("../controllers/manager_dashboardController");
+const { systemReport } = require("../controllers/systemReportController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
 const manager_accept_payment = require("../controllers/manager_accept_payment");
 const adminStoreManager = require('../controllers/adminStoreManager');
+const adminCentralKitchenManager = require('../controllers/adminCentralKitchenManager');
 
 /**
  * @swagger
@@ -2218,6 +2220,65 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
 
 /**
  * @swagger
+ * /api/admin/system_report:
+ *   get:
+ *     summary: Báo cáo hệ thống (Admin)
+ *     description: Cung cấp chỉ số tổng quan hệ thống theo UI báo cáo tổng hợp.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy báo cáo hệ thống thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 summary_cards:
+ *                   users:
+ *                     active: 5
+ *                     total: 6
+ *                   franchise_stores:
+ *                     active: 3
+ *                     total: 4
+ *                   total_orders: 11
+ *                   total_stock: 1145
+ *                 financial:
+ *                   paid_amount: 13000000
+ *                   unpaid_amount: 39600000
+ *                   total_order_value: 126350000
+ *                   collection_rate: 10
+ *                 order_status:
+ *                   pending: 1
+ *                   approved: 1
+ *                   processing: 8
+ *                   fulfilled: 5
+ *                   confirmed: 0
+ *                   cancelled: 1
+ *                 store_report:
+ *                   - franchise_store_id: 1
+ *                     store_name: "Chi nhanh Quan 1"
+ *                     total_orders: 6
+ *                     total_value: 78700000
+ *                     paid_amount: 4000000
+ *                     unpaid_amount: 39000000
+ *                 role_distribution:
+ *                   - role: "franchise_staff"
+ *                     total: 2
+ *                     active: 1
+ *                     inactive: 1
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.get("/admin/system_report", requireAuth, requireRole("admin"), systemReport);
+
+/**
+ * @swagger
  * /api/manager/product_inventory:
  *   get:
  *     summary: Manager Inventory Overview (System-wide storage)
@@ -3030,5 +3091,41 @@ router.put("/admin/franchise_stores/:store_id", requireAuth, requireRole("admin"
  *         description: Server/DB error
  */
 router.patch("/admin/franchise_stores/:store_id/status", requireAuth, requireRole("admin"), adminStoreManager.updateStatus);
+
+/**
+ * @swagger
+ * /admin/central_kitchens:
+ *   get:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Lấy danh sách bếp trung tâm
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - central_kitchen_id: 1
+ *                   kitchen_code: "CK-001"
+ *                   kitchen_name: "Central Kitchen - Thu Duc"
+ *                   kitchen_status: "active"
+ *                   kitchen_address: "100 Lý Thường Kiệt, Quận 10"
+ *                   kitchen_phone: "028-5555-1234"
+ *                   kitchen_email: "kitchen@franchise.com"
+ *                   staff_count: 12
+ *                   capacity: 500
+ *               message: null
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Server/DB error
+ */
+router.get("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCentralKitchenManager.getAllCentralKitchens);
 
 module.exports = router;
