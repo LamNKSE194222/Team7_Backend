@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const pool = require("../config/database");
 const { requireAuth } = require("../middleware/requireAuth");
 const authController = require("../controllers/authController");
 const productController = require("../controllers/productController");
@@ -23,7 +22,8 @@ const { systemReport } = require("../controllers/systemReportController");
 const systemSettingsController = require("../controllers/systemSettingsController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
-const manager_accept_payment = require("../controllers/manager_accept_payment");
+const manager_accept_payment = require("../controllers/manager_accept_payment.js");
+const admin_dashboard = require("../controllers/admin_dashboard.js")
 const adminStoreManager = require('../controllers/adminStoreManager');
 const adminCentralKitchenManager = require('../controllers/adminCentralKitchenManager');
 
@@ -1230,6 +1230,9 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                             product_name:
  *                               type: string
  *                               example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                             uom:
+ *                               type: string
+ *                               example: "cái"
  *                             qty:
  *                               type: integer
  *                               example: 20
@@ -1278,6 +1281,7 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                   product_details:
  *                     - product_id: 1
  *                       product_name: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       uom: "cái"
  *                       qty: 20
  *                       unit_price: 48000
  *                       line_total: 960000
@@ -2890,6 +2894,102 @@ router.patch("/Manager_restore_products/:id", requireAuth, requireRole("manager"
  *                   example: Server error
  */
 router.patch("/Manager_comfirmPaymentOrder/orders/:orderId", requireAuth, requireRole("manager", "admin"), manager_accept_payment.confirmPaymentOrder);
+
+
+/**
+ * @swagger
+ * /api/dashboard-admin:
+ *   get:
+ *     summary: Dashboard admin
+ *     description: Lấy dữ liệu tổng quan hệ thống cho tài khoản admin.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy dữ liệu dashboard admin thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     users:
+ *                       type: object
+ *                       properties:
+ *                         active:
+ *                           type: integer
+ *                           example: 5
+ *                         total:
+ *                           type: integer
+ *                           example: 10
+ *                         list:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               user_id:
+ *                                 type: integer
+ *                                 example: 1
+ *                               username:
+ *                                 type: string
+ *                                 example: "admin"
+ *                               email:
+ *                                 type: string
+ *                                 example: "admin@franchise.com"
+ *                               status:
+ *                                 type: string
+ *                                 example: "active"
+ *                               role:
+ *                                 type: string
+ *                                 example: "admin"
+ *                               franchise_store_id:
+ *                                 type: integer
+ *                                 nullable: true
+ *                                 example: null
+ *                               central_kitchen_id:
+ *                                 type: integer
+ *                                 nullable: true
+ *                                 example: null
+ *                               created_at:
+ *                                 type: string
+ *                                 format: date-time
+ *                                 example: "2026-03-10T21:26:31.257Z"
+ *                               last_login_at:
+ *                                 type: string
+ *                                 format: date-time
+ *                                 nullable: true
+ *                                 example: "2026-03-10T22:10:00.000Z"
+ *                     contents:
+ *                       type: object
+ *                       properties:
+ *                         products:
+ *                           type: integer
+ *                           example: 13
+ *                         stores:
+ *                           type: integer
+ *                           example: 6
+ *                         central_kitchens:
+ *                           type: integer
+ *                           example: 2
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *       401:
+ *         description: Unauthorized (không có token / token sai)
+ *       403:
+ *         description: Không có quyền truy cập
+ *       500:
+ *         description: Server error
+ */
+router.get('/dashboard-admin', requireAuth, requireRole("admin"), admin_dashboard.getAdmminDashboardStats);
 
 /**
  * @swagger

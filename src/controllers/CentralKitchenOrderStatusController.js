@@ -76,7 +76,7 @@ async function CentralGetOrders(req, res) {
     }
 }
 
-async function readyToDeliver(req, res) {
+  async function readyToDeliver(req, res) {
     const { orderId } = req.params;
     const kitchenId = req.user.central_kitchen_id;
 
@@ -163,6 +163,10 @@ async function getFulfilledOrders(req, res) {
                 o.order_code,
                 o.status,
                 o.fulfilled_at,
+                o.received_confirmed_at,
+                COUNT(oi.order_item_id) AS total_products,
+                STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names,
+                STRING_AGG(p.uom, ', ' ORDER BY p.name) AS product_uoms
                 o.franchise_store_id,
                 oi.product_id,
                 p.name AS product_name,
