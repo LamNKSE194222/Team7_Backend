@@ -187,6 +187,28 @@ async function createOrder(req, res) {
 
 async function getOrders(req, res) {
     try {
+        if (!req.user?.franchise_store_id) {
+            return res.status(403).json({
+                success: false,
+                message: "Không có quyền xem danh sách đơn hàng"
+            });
+        }
+
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.max(parseInt(req.query.limit) || 10, 1);
+        const offset = (page - 1) * limit;
+
+        const countRs = await pool.query(
+            `
+            SELECT COUNT(*)::int AS total_items
+            FROM orders o
+            WHERE o.franchise_store_id = $1
+            `,
+            [req.user.franchise_store_id]
+        );
+
+        const totalItems = Number(countRs.rows[0]?.total_items || 0);
+        const totalPages = Math.ceil(totalItems / limit);
 
         const rs = await pool.query(
             `
@@ -237,13 +259,27 @@ async function getOrders(req, res) {
                 o.desired_date,
                 o.fulfilled_at
             ORDER BY o.created_at DESC
+            LIMIT $2 OFFSET $3
             `,
-            [req.user.franchise_store_id]
+            [req.user.franchise_store_id, limit, offset]
         );
 
         return res.json({
             success: true,
-            data: rs.rows
+            data: rs.rows.map(row => ({
+                ...row,
+                total_amount: Number(row.total_amount),
+                total_items: Number(row.total_items),
+                total_product_qty: Number(row.total_product_qty)
+            })),
+            pagination: {
+                page,
+                limit,
+                total_items: totalItems,
+                total_pages: totalPages,
+                has_next_page: page < totalPages,
+                has_prev_page: page > 1
+            }
         });
 
     } catch (e) {
@@ -255,7 +291,6 @@ async function getOrders(req, res) {
         });
     }
 }
-
 async function cancelOrder(req, res) {
     const client = await pool.connect();
 
@@ -279,7 +314,7 @@ async function cancelOrder(req, res) {
 
         await client.query("BEGIN");
 
-        // Khóa dòng đơn hàng để tránh bị update đồng thời
+        // Khóa dòng đơn hàng để tránh update đồng thời
         const orderRs = await client.query(
             `
             SELECT
@@ -313,25 +348,20 @@ async function cancelOrder(req, res) {
             });
         }
 
+        // Chỉ cho hủy khi đang pending
         if (order.status !== "pending") {
             await client.query("ROLLBACK");
             return res.status(400).json({
                 success: false,
-                message: `Chỉ được xóa đơn khi trạng thái là pending. Hiện tại: ${order.status}`
+                message: `Chỉ được hủy đơn khi trạng thái là pending. Hiện tại: ${order.status}`
             });
         }
 
+        // Xóa mềm: chỉ cập nhật trạng thái
         await client.query(
             `
-            DELETE FROM order_item
-            WHERE order_id = $1
-            `,
-            [orderId]
-        );
-
-        await client.query(
-            `
-            DELETE FROM orders
+            UPDATE orders
+            SET status = 'cancelled'
             WHERE order_id = $1
             `,
             [orderId]
@@ -368,57 +398,57 @@ async function getPaymentOrders(req, res) {
 
         const rs = await pool.query(
             `
-    SELECT
-        o.order_id,
-        o.order_code,
-        COALESCE(o.payment_status, 'unpaid') AS payment_status,
-        o.paid_at,
-        o.created_at,
-        o.received_confirmed_at AS received_date,
+            SELECT
+                o.order_id,
+                o.order_code,
+                COALESCE(o.payment_status, 'unpaid') AS payment_status,
+                o.paid_at,
+                o.created_at,
+                o.received_confirmed_at AS received_date,
 
-        COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
+                COALESCE(SUM(oi.qty * oi.unit_price), 0)::bigint AS total_amount,
 
-        COALESCE(
-            STRING_AGG(
-                p.name || ': ' || TRIM(TO_CHAR(oi.qty, 'FM999999999999990')) || ' ' || COALESCE(oi.uom, ''),
-                E'\\n'
-                ORDER BY oi.order_item_id
-            ),
-            ''
-        ) AS product_summary,
+                COALESCE(
+                    STRING_AGG(
+                        p.name || ': ' || TRIM(TO_CHAR(oi.qty, 'FM999999999999990')) || ' ' || COALESCE(oi.uom, ''),
+                        E'\\n'
+                        ORDER BY oi.order_item_id
+                    ),
+                    ''
+                ) AS product_summary,
 
-        COALESCE(
-            JSON_AGG(
-                JSON_BUILD_OBJECT(
-                    'product_id', p.product_id,
-                    'product_name', p.name,
-                    'qty', TRIM(TO_CHAR(oi.qty, 'FM999999999999990')),
-                    'uom', oi.uom,
-                    'unit_price', oi.unit_price,
-                    'line_total', (oi.qty * oi.unit_price)
-                )
-                ORDER BY oi.order_item_id
-            ) FILTER (WHERE oi.order_item_id IS NOT NULL),
-            '[]'::json
-        ) AS items
+                COALESCE(
+                    JSON_AGG(
+                        JSON_BUILD_OBJECT(
+                            'product_id', p.product_id,
+                            'product_name', p.name,
+                            'qty', TRIM(TO_CHAR(oi.qty, 'FM999999999999990')),
+                            'uom', oi.uom,
+                            'unit_price', oi.unit_price,
+                            'line_total', (oi.qty * oi.unit_price)
+                        )
+                        ORDER BY oi.order_item_id
+                    ) FILTER (WHERE oi.order_item_id IS NOT NULL),
+                    '[]'::json
+                ) AS items
 
-    FROM orders o
-    LEFT JOIN order_item oi
-        ON oi.order_id = o.order_id
-    LEFT JOIN product p
-        ON p.product_id = oi.product_id
-    WHERE o.franchise_store_id = $1
-      AND COALESCE(o.payment_status, 'unpaid') IN ('unpaid', 'paid')
-      AND o.received_confirmed_at IS NOT NULL
-    GROUP BY
-        o.order_id,
-        o.order_code,
-        o.payment_status,
-        o.paid_at,
-        o.created_at,
-        o.received_confirmed_at
-    ORDER BY o.created_at DESC
-    `,
+            FROM orders o
+            LEFT JOIN order_item oi
+                ON oi.order_id = o.order_id
+            LEFT JOIN product p
+                ON p.product_id = oi.product_id
+            WHERE o.franchise_store_id = $1
+              AND COALESCE(o.payment_status, 'unpaid') IN ('unpaid', 'paid')
+              AND o.received_confirmed_at IS NOT NULL
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.payment_status,
+                o.paid_at,
+                o.created_at,
+                o.received_confirmed_at
+            ORDER BY o.created_at DESC
+            `,
             [req.user.franchise_store_id]
         );
 
@@ -427,10 +457,10 @@ async function getPaymentOrders(req, res) {
             .map(row => ({
                 order_id: row.order_id,
                 order_code: row.order_code,
-                products: row.product_summary, // text nhiều dòng để show đúng UI
-                items: row.items,              // FE có thể render từng dòng sản phẩm
                 amount: Number(row.total_amount),
                 received_date: row.received_date,
+                product_summary: row.product_summary,
+                items: row.items,
                 status: "unpaid",
                 status_label: "Chờ Thanh Toán"
             }));
@@ -440,11 +470,11 @@ async function getPaymentOrders(req, res) {
             .map(row => ({
                 order_id: row.order_id,
                 order_code: row.order_code,
-                products: row.product_summary,
-                items: row.items,
                 amount: Number(row.total_amount),
                 paid_at: row.paid_at,
                 received_date: row.received_date,
+                product_summary: row.product_summary,
+                items: row.items,
                 status: "paid",
                 status_label: "Đã Thanh Toán"
             }));
@@ -470,3 +500,7 @@ async function getPaymentOrders(req, res) {
 }
 
 module.exports = { createOrder, getOrders, cancelOrder, getPaymentOrders };
+
+
+
+
