@@ -20,6 +20,7 @@ const { getCentralKitchenProductInventory } = require("../controllers/centralKit
 const ManagerProductController = require("../controllers/manager_product_controller.js");
 const { Mdashboard } = require("../controllers/manager_dashboardController");
 const { systemReport } = require("../controllers/systemReportController");
+const systemSettingsController = require("../controllers/systemSettingsController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
 const manager_accept_payment = require("../controllers/manager_accept_payment");
@@ -2276,6 +2277,92 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
  *         description: Server error
  */
 router.get("/admin/system_report", requireAuth, requireRole("admin"), systemReport);
+
+/**
+ * @swagger
+ * /api/admin/system_settings:
+ *   get:
+ *     summary: Lấy cài đặt hệ thống
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy cài đặt thành công
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.get("/admin/system_settings", requireAuth, requireRole("admin"), systemSettingsController.getSystemSettings);
+
+/**
+ * @swagger
+ * /api/admin/system_settings:
+ *   put:
+ *     summary: Cập nhật cài đặt hệ thống
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               company_name:
+ *                 type: string
+ *               timezone:
+ *                 type: string
+ *               currency:
+ *                 type: string
+ *               notifications:
+ *                 type: object
+ *                 properties:
+ *                   low_stock_alert:
+ *                     type: boolean
+ *                   order_status_change_alert:
+ *                     type: boolean
+ *                   expiry_alert:
+ *                     type: boolean
+ *               email_config:
+ *                 type: object
+ *                 properties:
+ *                   smtp_host:
+ *                     type: string
+ *                   smtp_port:
+ *                     type: integer
+ *                   smtp_user:
+ *                     type: string
+ *                   smtp_password:
+ *                     type: string
+ *                   from_email:
+ *                     type: string
+ *               security:
+ *                 type: object
+ *                 properties:
+ *                   two_factor_auth:
+ *                     type: boolean
+ *                   auto_logout:
+ *                     type: boolean
+ *                   session_timeout_minutes:
+ *                     type: integer
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.put("/admin/system_settings", requireAuth, requireRole("admin"), systemSettingsController.updateSystemSettings);
 
 /**
  * @swagger
