@@ -141,7 +141,7 @@ async function getNewOrderDetail(req, res) {
               o.order_code,
               o.status,
               o.desired_date,
-              o.created_at,
+              o.created_at, 
               fs.name AS store_name
             FROM orders o
             JOIN franchise_store fs 
