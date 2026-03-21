@@ -3067,6 +3067,84 @@ router.get("/admin/users", requireAuth, requireRole("admin"), adminUserControlle
 
 /**
  * @swagger
+ * /api/admin/users:
+ *   post:
+ *     summary: Tạo mới người dùng
+ *     description: Admin tạo user mới
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 example: "Nguyễn Văn A"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "user@example.com"
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: Tạo user thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user_id:
+ *                       type: integer
+ *                       example: 10
+ *                     username:
+ *                       type: string
+ *                       example: "Nguyễn Văn A"
+ *                     email:
+ *                       type: string
+ *                       example: "user@example.com"
+ *                     status:
+ *                       type: string
+ *                       example: "active"
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                     last_login_at:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *                 message:
+ *                   type: string
+ *                   example: "Tạo user thành công"
+ *       400:
+ *         description: Validation error hoặc email đã tồn tại
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Server/DB error
+ */
+router.post("/admin/users", requireAuth, requireRole("admin"), adminUserController.createUser);
+
+/**
+ * @swagger
  * /api/admin/users/{userId}:
  *   patch:
  *     summary: Chỉnh sửa thông tin người dùng
@@ -3244,6 +3322,52 @@ router.patch("/admin/users/:userId/status", requireAuth, requireRole("admin"), a
 
 /**
  * @swagger
+ * /api/admin/users/{userId}:
+ *   delete:
+ *     summary: Xóa người dùng
+ *     description: Admin xóa user (không thể xóa admin)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *         description: ID của user cần xóa
+ *     responses:
+ *       200:
+ *         description: Xóa user thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: null
+ *                 message:
+ *                   type: string
+ *                   example: "Xóa user thành công"
+ *       400:
+ *         description: Validation error - userId không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin hoặc không thể xóa admin
+ *       404:
+ *         description: Không tìm thấy user
+ *       500:
+ *         description: Server/DB error
+ */
+router.delete("/admin/users/:userId", requireAuth, requireRole("admin"), adminUserController.deleteUser);
+
+/**
+ * @swagger
  * /admin/franchise_stores:
  *   get:
  *     tags:
@@ -3306,6 +3430,103 @@ router.patch("/admin/users/:userId/status", requireAuth, requireRole("admin"), a
  *         description: Lỗi server
  */
 router.get("/admin/franchise_stores", requireAuth, requireRole("admin"), adminStoreManager.getAllFranchiseStores);
+
+/**
+ * @swagger
+ * /admin/createfranchise_stores:
+ *   post:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Tạo mới cửa hàng franchise
+ *     description: API này sẽ tạo cửa hàng franchise mới.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - store_code
+ *               - store_name
+ *               - store_address
+ *             properties:
+ *               store_code:
+ *                 type: string
+ *                 description: Mã cửa hàng
+ *                 example: "FS-001"
+ *               store_name:
+ *                 type: string
+ *                 description: Tên cửa hàng
+ *                 example: "Chi Nhánh Quận 1"
+ *               store_address:
+ *                 type: string
+ *                 description: Địa chỉ cửa hàng
+ *                 example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *               store_phone:
+ *                 type: string
+ *                 description: Số điện thoại cửa hàng
+ *                 example: "028-1234-5678"
+ *               store_email:
+ *                 type: string
+ *                 description: Email của cửa hàng
+ *                 example: "store1@franchise.com"
+ *               manager_name:
+ *                 type: string
+ *                 description: Tên người quản lý cửa hàng
+ *                 example: "Nguyễn Văn A"
+ *     responses:
+ *       200:
+ *         description: Tạo cửa hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     franchise_store_id:
+ *                       type: integer
+ *                       example: 1
+ *                     store_code:
+ *                       type: string
+ *                       example: "FS-001"
+ *                     name:
+ *                       type: string
+ *                       example: "Chi Nhánh Quận 1"
+ *                     status:
+ *                       type: string
+ *                       example: "active"
+ *                     address:
+ *                       type: string
+ *                       example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                     phone:
+ *                       type: string
+ *                       example: "028-1234-5678"
+ *                     email:
+ *                       type: string
+ *                       example: "store1@franchise.com"
+ *                     manager_name:
+ *                       type: string
+ *                       example: "Nguyễn Văn A"
+ *                 message:
+ *                   type: string
+ *                   example: "Tạo cửa hàng thành công"
+ *       400:
+ *         description: Validation error hoặc mã cửa hàng đã tồn tại
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Server/DB error
+ */
+router.post("/admin/franchise_stores", requireAuth, requireRole("admin"), adminStoreManager.createFranchiseStore);
 
 /**
  * @swagger
@@ -3449,6 +3670,52 @@ router.patch("/admin/franchise_stores/:store_id/status", requireAuth, requireRol
 
 /**
  * @swagger
+ * /api/admin/franchise_stores/{store_id}:
+ *   delete:
+ *     summary: Xóa cửa hàng franchise
+ *     description: Admin xóa cửa hàng franchise (chỉ khi không còn nhân viên)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: store_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *         description: ID của cửa hàng cần xóa
+ *     responses:
+ *       200:
+ *         description: Xóa cửa hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: null
+ *                 message:
+ *                   type: string
+ *                   example: "Xóa cửa hàng thành công"
+ *       400:
+ *         description: Validation error hoặc cửa hàng còn nhân viên
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Cửa hàng không tồn tại
+ *       500:
+ *         description: Server/DB error
+ */
+router.delete("/admin/franchise_stores/:store_id", requireAuth, requireRole("admin"), adminStoreManager.deleteFranchiseStore);
+
+/**
+ * @swagger
  * /admin/central_kitchens:
  *   get:
  *     tags:
@@ -3482,6 +3749,110 @@ router.patch("/admin/franchise_stores/:store_id/status", requireAuth, requireRol
  *         description: Server/DB error
  */
 router.get("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCentralKitchenManager.getAllCentralKitchens);
+
+/**
+ * @swagger
+ * /admin/createcentral_kitchens:
+ *   post:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Tạo mới bếp trung tâm
+ *     description: API này sẽ tạo bếp trung tâm mới.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - kitchen_code
+ *               - kitchen_name
+ *               - kitchen_address
+ *             properties:
+ *               kitchen_code:
+ *                 type: string
+ *                 description: Mã bếp trung tâm
+ *                 example: "CK-001"
+ *               kitchen_name:
+ *                 type: string
+ *                 description: Tên bếp trung tâm
+ *                 example: "Central Kitchen - Thu Duc"
+ *               kitchen_address:
+ *                 type: string
+ *                 description: Địa chỉ bếp trung tâm
+ *                 example: "100 Lý Thường Kiệt, Quận 10"
+ *               kitchen_phone:
+ *                 type: string
+ *                 description: Số điện thoại bếp trung tâm
+ *                 example: "028-5555-1234"
+ *               kitchen_email:
+ *                 type: string
+ *                 description: Email của bếp trung tâm
+ *                 example: "kitchen@franchise.com"
+ *               production_capacity:
+ *                 type: integer
+ *                 description: Sức sản xuất
+ *                 example: 500
+ *               staff_count:
+ *                 type: integer
+ *                 description: Số lượng nhân viên
+ *                 example: 12
+ *     responses:
+ *       200:
+ *         description: Tạo bếp trung tâm thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     central_kitchen_id:
+ *                       type: integer
+ *                       example: 1
+ *                     kitchen_code:
+ *                       type: string
+ *                       example: "CK-001"
+ *                     kitchen_name:
+ *                       type: string
+ *                       example: "Central Kitchen - Thu Duc"
+ *                     kitchen_status:
+ *                       type: string
+ *                       example: "active"
+ *                     kitchen_address:
+ *                       type: string
+ *                       example: "100 Lý Thường Kiệt, Quận 10"
+ *                     kitchen_phone:
+ *                       type: string
+ *                       example: "028-5555-1234"
+ *                     kitchen_email:
+ *                       type: string
+ *                       example: "kitchen@franchise.com"
+ *                     production_capacity:
+ *                       type: integer
+ *                       example: 500
+ *                     staff_count:
+ *                       type: integer
+ *                       example: 12
+ *                 message:
+ *                   type: string
+ *                   example: "Tạo bếp trung tâm thành công"
+ *       400:
+ *         description: Validation error hoặc mã bếp trung tâm đã tồn tại
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Server/DB error
+ */
+router.post("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCentralKitchenManager.createCentralKitchen);
 
 /**
  * @swagger
@@ -3602,5 +3973,51 @@ router.put("/admin/central_kitchens/:kitchen_id", requireAuth, requireRole("admi
  *         description: Server error
  */
 router.patch("/admin/central_kitchens/:kitchen_id/status", requireAuth, requireRole("admin"), adminCentralKitchenManager.updateStatus);
+
+/**
+ * @swagger
+ * /api/admin/central_kitchens/{kitchen_id}:
+ *   delete:
+ *     summary: Xóa bếp trung tâm
+ *     description: Admin xóa bếp trung tâm (chỉ khi không còn nhân viên)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: kitchen_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *         description: ID của bếp trung tâm cần xóa
+ *     responses:
+ *       200:
+ *         description: Xóa bếp trung tâm thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: null
+ *                 message:
+ *                   type: string
+ *                   example: "Xóa bếp trung tâm thành công"
+ *       400:
+ *         description: Validation error hoặc bếp còn nhân viên
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Bếp trung tâm không tồn tại
+ *       500:
+ *         description: Server/DB error
+ */
+router.delete("/admin/central_kitchens/:kitchen_id", requireAuth, requireRole("admin"), adminCentralKitchenManager.deleteCentralKitchen);
 
 module.exports = router;
