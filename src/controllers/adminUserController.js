@@ -1,7 +1,6 @@
 const bcrypt = require("bcrypt");
 const pool = require("../config/database");
 
-// GET /api/admin/users
 async function listUsers(req, res) {
     try {
         const keyword = (req.query.keyword || "").trim();
@@ -125,7 +124,6 @@ async function listUsers(req, res) {
     }
 }
 
-// PATCH /api/admin/users/:userId
 async function updateUser(req, res) {
     try {
         const userId = Number(req.params.userId);
@@ -204,7 +202,6 @@ async function updateUser(req, res) {
     }
 }
 
-// PATCH /api/admin/users/:userId/reset-password
 async function resetPassword(req, res) {
     try {
         const userId = Number(req.params.userId);
@@ -265,7 +262,6 @@ async function resetPassword(req, res) {
     }
 }
 
-// PATCH /api/admin/users/:userId/status
 async function updateUserStatus(req, res) {
     try {
         const userId = Number(req.params.userId);
@@ -341,4 +337,129 @@ async function updateUserStatus(req, res) {
     }
 }
 
-module.exports = { listUsers, updateUser, resetPassword, updateUserStatus, };
+async function createUser(req, res) {
+    try {
+        const { username, email, password } = req.body || {};
+
+        if (!username || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "username, email và password là bắt buộc",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        if (String(password).length < 6) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "Mật khẩu phải có ít nhất 6 ký tự",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        const duplicate = await pool.query(
+            `SELECT user_id FROM "user" WHERE email = $1`,
+            [email]
+        );
+
+        if (duplicate.rowCount > 0) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "Email đã tồn tại",
+                error_code: "EMAIL_ALREADY_EXISTS",
+            });
+        }
+
+        const passwordHash = await bcrypt.hash(String(password), 10);
+
+        const rs = await pool.query(
+            `
+            INSERT INTO "user" (username, email, password, status)
+            VALUES ($1, $2, $3, 'active')
+            RETURNING user_id, username, email, status, created_at, last_login_at
+            `,
+            [username.trim(), email.trim(), passwordHash]
+        );
+
+        return res.json({
+            success: true,
+            data: rs.rows[0],
+            message: "Tạo user thành công",
+        });
+    } catch (e) {
+        console.error("ADMIN CREATE USER ERROR:", e);
+        return res.status(500).json({
+            success: false,
+            data: null,
+            message: "Server/DB error",
+            error_code: "SERVER_ERROR",
+        });
+    }
+}
+
+async function deleteUser(req, res) {
+    try {
+        const userId = req.params.userId;
+
+        if (!userId || isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "userId không hợp lệ",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        // Kiểm tra user có tồn tại không
+        const user = await pool.query(
+            `SELECT user_id, username, email FROM "user" WHERE user_id = $1`,
+            [userId]
+        );
+
+        if (user.rowCount === 0) {
+            return res.status(404).json({
+                success: false,
+                data: null,
+                message: "User không tồn tại",
+                error_code: "USER_NOT_FOUND",
+            });
+        }
+
+        // Kiểm tra user có phải là admin không (không cho xóa admin)
+        const adminCheck = await pool.query(
+            `SELECT is_admin FROM manager WHERE user_id = $1`,
+            [userId]
+        );
+
+        if (adminCheck.rowCount > 0 && adminCheck.rows[0].is_admin) {
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Không thể xóa tài khoản admin",
+                error_code: "CANNOT_DELETE_ADMIN",
+            });
+        }
+
+        // Xóa user (cascade sẽ xóa các bản ghi liên quan)
+        await pool.query(`DELETE FROM "user" WHERE user_id = $1`, [userId]);
+
+        return res.json({
+            success: true,
+            data: null,
+            message: "Xóa user thành công",
+        });
+    } catch (e) {
+        console.error("ADMIN DELETE USER ERROR:", e);
+        return res.status(500).json({
+            success: false,
+            data: null,
+            message: "Server/DB error",
+            error_code: "SERVER_ERROR",
+        });
+    }
+}
+
+module.exports = { listUsers, updateUser, resetPassword, updateUserStatus, createUser, deleteUser };

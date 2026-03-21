@@ -143,5 +143,105 @@ async function updateStatus(req, res) {
     }
 }
 
+async function createFranchiseStore(req, res) {
+    const { store_code, store_name, store_address, store_phone, store_email, manager_name } = req.body;
 
-module.exports = { getAllFranchiseStores, updateFranchiseStore, updateStatus };
+    try {
+        // Kiểm tra các trường bắt buộc
+        if (!store_code || !store_name || !store_address) {
+            return res.status(400).json({
+                success: false,
+                message: "store_code, store_name và store_address là bắt buộc",
+            });
+        }
+
+        // Kiểm tra store_code đã tồn tại chưa
+        const existingStore = await pool.query(
+            `SELECT * FROM franchise_store WHERE store_code = $1`,
+            [store_code]
+        );
+
+        if (existingStore.rows.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Mã cửa hàng này đã tồn tại",
+            });
+        }
+
+        // Thêm cửa hàng mới
+        const result = await pool.query(
+            `
+            INSERT INTO franchise_store (store_code, name, address, phone, email, manager_name, status)
+            VALUES ($1, $2, $3, $4, $5, $6, 'active')
+            RETURNING *;
+            `,
+            [store_code, store_name, store_address, store_phone, store_email, manager_name]
+        );
+
+        return res.json({
+            success: true,
+            data: result.rows[0],
+            message: "Tạo cửa hàng thành công",
+        });
+    } catch (err) {
+        console.error("Error creating franchise store:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Lỗi khi tạo cửa hàng",
+            error_code: "SERVER_ERROR",
+        });
+    }
+}
+
+async function deleteFranchiseStore(req, res) {
+    const store_id = req.params.store_id;
+
+    try {
+        // Kiểm tra xem cửa hàng có tồn tại không
+        const currentStore = await pool.query(
+            `SELECT * FROM franchise_store WHERE franchise_store_id = $1`,
+            [store_id]
+        );
+
+        if (currentStore.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Cửa hàng không tồn tại",
+            });
+        }
+
+        // Kiểm tra xem cửa hàng có nhân viên nào không
+        const staffCount = await pool.query(
+            `SELECT COUNT(*) as count FROM franchise_staff WHERE franchise_store_id = $1`,
+            [store_id]
+        );
+
+        if (parseInt(staffCount.rows[0].count) > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Không thể xóa cửa hàng vì còn nhân viên đang làm việc",
+            });
+        }
+
+        // Xóa cửa hàng
+        await pool.query(
+            `DELETE FROM franchise_store WHERE franchise_store_id = $1`,
+            [store_id]
+        );
+
+        return res.json({
+            success: true,
+            data: null,
+            message: "Xóa cửa hàng thành công",
+        });
+    } catch (err) {
+        console.error("Error deleting franchise store:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Lỗi khi xóa cửa hàng",
+            error_code: "SERVER_ERROR",
+        });
+    }
+}
+
+module.exports = { getAllFranchiseStores, updateFranchiseStore, updateStatus, createFranchiseStore, deleteFranchiseStore };
