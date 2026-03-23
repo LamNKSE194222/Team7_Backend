@@ -45,7 +45,7 @@ async function CentralGetOrders(req, res) {
                 ON oi.order_id = o.order_id
             LEFT JOIN product p
                 ON p.product_id = oi.product_id
-            WHERE o.central_Kitchen_id = $1
+            WHERE o.central_kitchen_id = $1
             GROUP BY
                 o.order_id,
                 o.order_code,
@@ -164,23 +164,28 @@ async function getFulfilledOrders(req, res) {
                 o.status,
                 o.fulfilled_at,
                 o.received_confirmed_at,
-                COUNT(oi.order_item_id) AS total_products,
-                STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names,
-                STRING_AGG(p.uom, ', ' ORDER BY p.name) AS product_uoms
                 o.franchise_store_id,
-                oi.product_id,
-                p.name AS product_name,
-                oi.qty,
-                oi.uom,
-                oi.unit_price
+                fs.name AS store_name,
+                COUNT(oi.order_item_id) AS total_items,
+                STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names
             FROM orders o
-            JOIN order_item oi
+            LEFT JOIN franchise_store fs
+                ON fs.franchise_store_id = o.franchise_store_id
+            LEFT JOIN order_item oi
                 ON oi.order_id = o.order_id
-            JOIN product p
+            LEFT JOIN product p
                 ON p.product_id = oi.product_id
             WHERE o.central_kitchen_id = $1
               AND o.status = 'fulfilled'
-            ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC, oi.order_item_id ASC
+            GROUP BY
+                o.order_id,
+                o.order_code,
+                o.status,
+                o.fulfilled_at,
+                o.received_confirmed_at,
+                o.franchise_store_id,
+                fs.name
+            ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC
             `,
             [kitchenId]
         );
