@@ -22,8 +22,8 @@ AND received_confirmed_at < date_trunc('month', CURRENT_DATE) + interval '1 mont
         // Lấy những item có available = on_hand - reserved <= threshold
         const threshold = Number(req.query.threshold || 5);
 
-const lowStockRs = await pool.query(
-`
+        const lowStockRs = await pool.query(
+            `
 SELECT
     m.material_id,
     m.name AS material_name,
@@ -38,8 +38,8 @@ WHERE ckii.on_hand_qty <= $1
 ORDER BY ckii.on_hand_qty ASC
 LIMIT 10
 `,
-[threshold]
-);
+            [threshold]
+        );
 
         const lowStockCount = lowStockRs.rows.length;
 
@@ -66,7 +66,10 @@ LIMIT 10
         const materialsInventoryRs = await pool.query(`
     SELECT
         ckii.inventory_item_id,
+        m.material_id,
         m.name AS material_name,
+        m.cost_price,
+        m.min_stock,
         ckii.on_hand_qty,
         ckii.expiry_date,
         m.uom,

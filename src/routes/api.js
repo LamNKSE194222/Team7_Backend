@@ -22,6 +22,7 @@ const { Mdashboard } = require("../controllers/manager_dashboardController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
 const manager_accept_payment = require("../controllers/manager_accept_payment");
+const { getMaterialById, createMaterial, updateMaterial, deleteMaterial, getMaterialTypes } = require("../controllers/manager_materialController");
 
 /**
  * @swagger
@@ -2136,6 +2137,12 @@ router.get("/centralKitchen/product-inventory", requireAuth, requireKitchenStaff
  *         description: Forbidden
  */
 router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), Mdashboard);
+
+router.get("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), getMaterialById);
+router.get("/manager/material-types", requireAuth, requireRole("manager", "admin"), getMaterialTypes);
+router.post("/manager/materials", requireAuth, requireRole("manager", "admin"), createMaterial);
+router.put("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), updateMaterial);
+router.delete("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), deleteMaterial);
 
 /**
  * @swagger
