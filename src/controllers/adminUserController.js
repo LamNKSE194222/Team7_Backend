@@ -338,8 +338,17 @@ async function updateUserStatus(req, res) {
 }
 
 async function createUser(req, res) {
+    const client = await pool.connect();
+
     try {
-        const { username, email, password } = req.body || {};
+        const {
+            username,
+            email,
+            password,
+            role = "user",
+            franchise_store_id,
+            central_kitchen_id
+        } = req.body || {};
 
         if (!username || !email || !password) {
             return res.status(400).json({
@@ -359,9 +368,18 @@ async function createUser(req, res) {
             });
         }
 
-        const duplicate = await pool.query(
+        if (!["user", "manager", "admin", "franchise_staff", "kitchen_staff"].includes(role)) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "role không hợp lệ",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        const duplicate = await client.query(
             `SELECT user_id FROM "user" WHERE email = $1`,
-            [email]
+            [email.trim()]
         );
 
         if (duplicate.rowCount > 0) {
@@ -373,9 +391,11 @@ async function createUser(req, res) {
             });
         }
 
+        await client.query("BEGIN");
+
         const passwordHash = await bcrypt.hash(String(password), 10);
 
-        const rs = await pool.query(
+        const rs = await client.query(
             `
             INSERT INTO "user" (username, email, password, status)
             VALUES ($1, $2, $3, 'active')
@@ -384,82 +404,179 @@ async function createUser(req, res) {
             [username.trim(), email.trim(), passwordHash]
         );
 
+        const newUser = rs.rows[0];
+
+        if (role === "admin" || role === "manager") {
+            const isAdmin = role === "admin";
+            const managerCode = `MG-${newUser.user_id}`;
+
+            await client.query(
+                `
+                INSERT INTO manager (user_id, manager_code, is_admin)
+                VALUES ($1, $2, $3)
+                `,
+                [newUser.user_id, managerCode, isAdmin]
+            );
+        } else if (role === "franchise_staff") {
+            if (!franchise_store_id) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({
+                    success: false,
+                    data: null,
+                    message: "franchise_store_id là bắt buộc khi role là franchise_staff",
+                    error_code: "VALIDATION_ERROR",
+                });
+            }
+
+            const storeCheck = await client.query(
+                `SELECT franchise_store_id FROM franchise_store WHERE franchise_store_id = $1`,
+                [franchise_store_id]
+            );
+
+            if (storeCheck.rowCount === 0) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({
+                    success: false,
+                    data: null,
+                    message: "franchise_store_id không tồn tại",
+                    error_code: "NOT_FOUND",
+                });
+            }
+
+            const staffCode = `FS-STAFF-${newUser.user_id}`;
+
+            await client.query(
+                `
+                INSERT INTO franchise_staff (user_id, franchise_store_id, staff_code, status)
+                VALUES ($1, $2, $3, 'active')
+                `,
+                [newUser.user_id, franchise_store_id, staffCode]
+            );
+
+            await client.query(
+                `
+                UPDATE franchise_store
+                SET email = $1
+                WHERE franchise_store_id = $2
+                `,
+                [email.trim(), franchise_store_id]
+            );
+        } else if (role === "kitchen_staff") {
+            if (!central_kitchen_id) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({
+                    success: false,
+                    data: null,
+                    message: "central_kitchen_id là bắt buộc khi role là kitchen_staff",
+                    error_code: "VALIDATION_ERROR",
+                });
+            }
+
+            const kitchenCheck = await client.query(
+                `SELECT central_kitchen_id FROM central_kitchen WHERE central_kitchen_id = $1`,
+                [central_kitchen_id]
+            );
+
+            if (kitchenCheck.rowCount === 0) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({
+                    success: false,
+                    data: null,
+                    message: "central_kitchen_id không tồn tại",
+                    error_code: "NOT_FOUND",
+                });
+            }
+
+            const staffCode = `KS-STAFF-${newUser.user_id}`;
+
+            await client.query(
+                `
+                INSERT INTO kitchen_staff (user_id, central_kitchen_id, staff_code, status)
+                VALUES ($1, $2, $3, 'active')
+                `,
+                [newUser.user_id, central_kitchen_id, staffCode]
+            );
+
+            await client.query(
+                `
+                UPDATE central_kitchen
+                SET email = $1
+                WHERE central_kitchen_id = $2
+                `,
+                [email.trim(), central_kitchen_id]
+            );
+        }
+
+        await client.query("COMMIT");
+
+        const profile = await pool.query(
+            `
+            SELECT
+                u.user_id,
+                u.username,
+                u.email,
+                u.status,
+                u.created_at,
+                u.last_login_at,
+                m.manager_code,
+                m.is_admin,
+                fs.franchise_store_id,
+                fs.staff_code AS franchise_staff_code,
+                ks.central_kitchen_id,
+                ks.staff_code AS kitchen_staff_code
+            FROM "user" u
+            LEFT JOIN manager m ON m.user_id = u.user_id
+            LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
+            LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
+            WHERE u.user_id = $1
+            LIMIT 1
+            `,
+            [newUser.user_id]
+        );
+
+        const u = profile.rows[0] || newUser;
+
+        let userRole = "user";
+        if (u.is_admin) userRole = "admin";
+        else if (u.manager_code) userRole = "manager";
+        else if (u.franchise_store_id) userRole = "franchise_staff";
+        else if (u.central_kitchen_id) userRole = "kitchen_staff";
+
         return res.json({
             success: true,
-            data: rs.rows[0],
+            data: {
+                user_id: u.user_id,
+                username: u.username,
+                email: u.email,
+                status: u.status,
+                role: userRole,
+                manager_code: u.manager_code ?? null,
+                franchise_store_id: u.franchise_store_id ?? null,
+                franchise_staff_code: u.franchise_staff_code ?? null,
+                central_kitchen_id: u.central_kitchen_id ?? null,
+                kitchen_staff_code: u.kitchen_staff_code ?? null,
+                created_at: u.created_at ?? null,
+                last_login_at: u.last_login_at ?? null
+            },
             message: "Tạo user thành công",
         });
     } catch (e) {
         console.error("ADMIN CREATE USER ERROR:", e);
+        try {
+            await client.query("ROLLBACK");
+        } catch (rollbackError) {
+            console.error("Rollback failed", rollbackError);
+        }
+
         return res.status(500).json({
             success: false,
             data: null,
             message: "Server/DB error",
             error_code: "SERVER_ERROR",
         });
+    } finally {
+        client.release();
     }
 }
 
-async function deleteUser(req, res) {
-    try {
-        const userId = req.params.userId;
-
-        if (!userId || isNaN(userId)) {
-            return res.status(400).json({
-                success: false,
-                data: null,
-                message: "userId không hợp lệ",
-                error_code: "VALIDATION_ERROR",
-            });
-        }
-
-        // Kiểm tra user có tồn tại không
-        const user = await pool.query(
-            `SELECT user_id, username, email FROM "user" WHERE user_id = $1`,
-            [userId]
-        );
-
-        if (user.rowCount === 0) {
-            return res.status(404).json({
-                success: false,
-                data: null,
-                message: "User không tồn tại",
-                error_code: "USER_NOT_FOUND",
-            });
-        }
-
-        // Kiểm tra user có phải là admin không (không cho xóa admin)
-        const adminCheck = await pool.query(
-            `SELECT is_admin FROM manager WHERE user_id = $1`,
-            [userId]
-        );
-
-        if (adminCheck.rowCount > 0 && adminCheck.rows[0].is_admin) {
-            return res.status(403).json({
-                success: false,
-                data: null,
-                message: "Không thể xóa tài khoản admin",
-                error_code: "CANNOT_DELETE_ADMIN",
-            });
-        }
-
-        // Xóa user (cascade sẽ xóa các bản ghi liên quan)
-        await pool.query(`DELETE FROM "user" WHERE user_id = $1`, [userId]);
-
-        return res.json({
-            success: true,
-            data: null,
-            message: "Xóa user thành công",
-        });
-    } catch (e) {
-        console.error("ADMIN DELETE USER ERROR:", e);
-        return res.status(500).json({
-            success: false,
-            data: null,
-            message: "Server/DB error",
-            error_code: "SERVER_ERROR",
-        });
-    }
-}
-
-module.exports = { listUsers, updateUser, resetPassword, updateUserStatus, createUser, deleteUser };
+module.exports = { listUsers, updateUser, resetPassword, updateUserStatus, createUser };

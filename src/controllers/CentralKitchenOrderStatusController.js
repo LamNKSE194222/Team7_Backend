@@ -45,7 +45,7 @@ async function CentralGetOrders(req, res) {
                 ON oi.order_id = o.order_id
             LEFT JOIN product p
                 ON p.product_id = oi.product_id
-            WHERE o.central_Kitchen_id = $1
+            WHERE o.central_kitchen_id = $1
             GROUP BY
                 o.order_id,
                 o.order_code,
