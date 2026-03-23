@@ -5,13 +5,19 @@ async function getAllFranchiseStores(req, res) {
         const rs = await pool.query(
             `
             SELECT
-                franchise_store_id,
-                store_code,
-                name AS store_name,
-                status AS store_status,
-                address AS store_address
-            FROM franchise_store
-            ORDER BY store_name ASC;
+                fs.franchise_store_id,
+                fs.store_code,
+                fs.name AS store_name,
+                fs.status AS store_status,
+                fs.address AS store_address,
+                u.username AS manager_name,
+                u.email AS manager_email
+            FROM franchise_store fs
+            LEFT JOIN franchise_staff fst
+                ON fst.franchise_store_id = fs.franchise_store_id
+            LEFT JOIN "user" u
+                ON u.user_id = fst.user_id
+            ORDER BY fs.name ASC;
             `
         );
 
@@ -85,6 +91,53 @@ async function updateFranchiseStore(req, res) {
         return res.status(500).json({
             success: false,
             message: "Lỗi khi cập nhật thông tin cửa hàng",
+            error_code: "SERVER_ERROR",
+        });
+    }
+}
+
+async function getFranchiseStoreById(req, res) {
+    const store_id = req.params.store_id;
+
+    try {
+        const rs = await pool.query(
+            `
+            SELECT
+                fs.franchise_store_id,
+                fs.store_code,
+                fs.name AS store_name,
+                fs.status AS store_status,
+                fs.address AS store_address,
+                u.user_id AS manager_user_id,
+                u.username AS manager_name,
+                u.email AS manager_email
+            FROM franchise_store fs
+            LEFT JOIN franchise_staff fst
+                ON fst.franchise_store_id = fs.franchise_store_id
+            LEFT JOIN "user" u
+                ON u.user_id = fst.user_id
+            WHERE fs.franchise_store_id = $1
+            `,
+            [store_id]
+        );
+
+        if (rs.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Cửa hàng không tồn tại"
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: rs.rows[0],
+            message: null
+        });
+    } catch (err) {
+        console.error("getFranchiseStoreById error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Server/DB error",
             error_code: "SERVER_ERROR",
         });
     }
@@ -185,4 +238,4 @@ async function createFranchiseStore(req, res) {
 }
 
 
-module.exports = { getAllFranchiseStores, updateFranchiseStore, updateStatus, createFranchiseStore };
+module.exports = { getAllFranchiseStores, updateFranchiseStore, updateStatus, createFranchiseStore, getFranchiseStoreById };
