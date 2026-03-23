@@ -2670,7 +2670,7 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  * @swagger
  * /api/Manager_update_products/{id}:
  *   put:
- *     summary: Update product information and materials
+ *     summary: Update product information, materials, and inventory details
  *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
@@ -2697,9 +2697,6 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  *               uom:
  *                 type: string
  *                 example: cái
- *               sku:
- *                 type: string
- *                 example: SKU-MC-MUNG-150
  *               price:
  *                 type: number
  *                 example: 48000
@@ -2709,6 +2706,18 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  *               is_active:
  *                 type: boolean
  *                 example: true
+ *               expiry_date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-12-31"
+ *               on_hand_qty:
+ *                 type: number
+ *                 format: float
+ *                 example: 100
+ *               min_qty:
+ *                 type: number
+ *                 format: float
+ *                 example: 10
  *               materials:
  *                 type: array
  *                 items:
