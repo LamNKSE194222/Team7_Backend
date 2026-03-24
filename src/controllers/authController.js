@@ -179,6 +179,27 @@ async function login(req, res) {
     }
 }
 
+// Logout user
+async function logout(req, res) {
+    try {
+        // Với JWT, logout thường chỉ cần client xóa token
+        // Server có thể thêm token vào blacklist nếu cần
+        return res.json({
+            success: true,
+            data: null,
+            message: "Logged out successfully",
+        });
+    } catch (e) {
+        console.error("LOGOUT ERROR:", e);
+        return res.status(500).json({
+            success: false,
+            data: null,
+            message: "Server error",
+            error_code: "SERVER_ERROR",
+        });
+    }
+}
+
 // Get current user info
 async function me(req, res) {
     try {
@@ -209,4 +230,4 @@ async function me(req, res) {
     }
 }
 
-module.exports = { login, me };
+module.exports = { login, logout, me };
