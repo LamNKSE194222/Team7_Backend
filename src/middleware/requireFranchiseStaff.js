@@ -23,9 +23,15 @@ async function requireFranchiseStaff(req, res, next) {
 
         const rs = await pool.query(
             `
-            SELECT user_id, franchise_store_id, status
-            FROM franchise_staff
-            WHERE user_id = $1
+            SELECT
+                fs.user_id,
+                fs.franchise_store_id,
+                fs.status AS staff_status,
+                fst.status AS store_status
+            FROM franchise_staff fs
+            JOIN franchise_store fst
+                ON fst.franchise_store_id = fs.franchise_store_id
+            WHERE fs.user_id = $1
             `,
             [userId]
         );
@@ -38,11 +44,19 @@ async function requireFranchiseStaff(req, res, next) {
             });
         }
 
-        if (rs.rows[0].status !== "active") {
+        if (rs.rows[0].staff_status !== "active") {
             return res.status(403).json({
                 success: false,
                 message: "Franchise staff inactive",
                 error_code: "STAFF_INACTIVE"
+            });
+        }
+
+        if (rs.rows[0].store_status !== "active") {
+            return res.status(403).json({
+                success: false,
+                message: "Franchise store inactive",
+                error_code: "STORE_INACTIVE"
             });
         }
 

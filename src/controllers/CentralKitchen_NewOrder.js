@@ -52,6 +52,7 @@ async function listNewOrders(req, res) {
               o.status,
               o.desired_date,
               o.created_at,
+              o.note,
               fs.name AS store_name
             FROM orders o
             JOIN franchise_store fs 
@@ -104,6 +105,7 @@ async function listNewOrders(req, res) {
             status: o.status,
             desired_date: o.desired_date,
             created_at: o.created_at,
+            note: o.note,
             items_preview: previewMap.get(o.order_id) || [],
         }));
 
@@ -141,7 +143,8 @@ async function getNewOrderDetail(req, res) {
               o.order_code,
               o.status,
               o.desired_date,
-              o.created_at,
+              o.created_at, 
+              o.note,
               fs.name AS store_name
             FROM orders o
             JOIN franchise_store fs 

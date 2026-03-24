@@ -52,7 +52,6 @@ async function Cdashboard(req, res) {
         o.order_code,
         o.status,
         o.created_at,
-        o.delivered_at,
         o.desired_date,
         fs.name AS store_name,
         COUNT(oi.order_item_id)::int AS product_count

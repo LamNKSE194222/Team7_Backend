@@ -1,10 +1,6 @@
 const bcrypt = require("bcrypt");
 const pool = require("../config/database");
 
-/*
-GET /api/profile
-Lấy thông tin profile
-*/
 async function getProfile(req, res) {
     try {
         const userId = req.user?.user_id;
@@ -107,10 +103,6 @@ async function getProfile(req, res) {
     }
 }
 
-/*
-PATCH /api/profile
-Cập nhật username
-*/
 async function updateProfile(req, res) {
     try {
         const userId = req.user?.user_id;
@@ -169,10 +161,6 @@ async function updateProfile(req, res) {
     }
 }
 
-/*
-PATCH /api/profile/change-password
-Đổi mật khẩu
-*/
 async function changePassword(req, res) {
     try {
         const userId = req.user?.user_id;

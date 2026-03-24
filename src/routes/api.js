@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const pool = require("../config/database");
 const { requireAuth } = require("../middleware/requireAuth");
 const authController = require("../controllers/authController");
 const productController = require("../controllers/productController");
@@ -15,13 +14,17 @@ const { requireFranchiseStaff } = require("../middleware/requireFranchiseStaff")
 const franchiseInventoryController = require("../controllers/franchiseInventoryController");
 const { getCentralKitchenMaterialsInventory } = require("../controllers/CentralKitchenMaterialsInventory.js");
 const receiveConfirmController = require("../controllers/receiveConfirmController");
-const { readyToDeliver, getFulfilledOrders, getProcessingOrders } = require("../controllers/CentralKitchenOrderStatusController");
+const { readyToDeliver, getFulfilledOrders, getProcessingOrders, CentralGetOrders } = require("../controllers/CentralKitchenOrderStatusController");
 const { getCentralKitchenProductInventory } = require("../controllers/centralKitchenProductInventoryController");
 const ManagerProductController = require("../controllers/manager_product_controller.js");
 const { Mdashboard } = require("../controllers/manager_dashboardController");
+const { systemReport } = require("../controllers/systemReportController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
-const manager_accept_payment = require("../controllers/manager_accept_payment");
+const manager_accept_payment = require("../controllers/manager_accept_payment.js");
+const admin_dashboard = require("../controllers/admin_dashboard.js")
+const adminStoreManager = require('../controllers/adminStoreManager');
+const adminCentralKitchenManager = require('../controllers/adminCentralKitchenManager');
 const { getMaterialById, createMaterial, updateMaterial, deleteMaterial, getMaterialTypes, getCentralKitchens } = require("../controllers/manager_materialController");
 
 /**
@@ -36,8 +39,6 @@ const { getMaterialById, createMaterial, updateMaterial, deleteMaterial, getMate
  *   - name: Central Kitchen
  *     description: Central Kitchen staff APIs
  */const { requireRole } = require("../middleware/requireRole");
-
-
 
 /**
  * @swagger
@@ -876,11 +877,28 @@ router.get("/products", requireAuth, productController.list);
  *       - tổng tiền chờ thanh toán
  *       - tổng số đơn hàng
  *       - số lượng đơn theo từng trạng thái
- *       - danh sách đơn hàng gần đây
+ *       - danh sách đơn hàng gần đây có phân trang
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Trang hiện tại của danh sách đơn gần đây
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 5
+ *           minimum: 1
+ *         description: Số lượng đơn hàng mỗi trang
  *     responses:
  *       200:
  *         description: Lấy dashboard thành công
@@ -908,7 +926,7 @@ router.get("/products", requireAuth, productController.list);
  *                           description: Tổng tiền các đơn chưa thanh toán
  *                         total_orders:
  *                           type: integer
- *                           example: 3
+ *                           example: 36
  *                           description: Tổng số đơn hàng của cửa hàng
  *                     cards:
  *                       type: object
@@ -916,108 +934,94 @@ router.get("/products", requireAuth, productController.list);
  *                         pending:
  *                           type: integer
  *                           example: 1
- *                           description: Số đơn chờ xử lý
  *                         approved:
  *                           type: integer
  *                           example: 0
- *                           description: Số đơn đã chấp nhận
  *                         processing:
  *                           type: integer
- *                           example: 0
- *                           description: Số đơn đang chuẩn bị
+ *                           example: 5
  *                         fulfilled:
  *                           type: integer
- *                           example: 2
- *                           description: Số đơn sẵn sàng giao
+ *                           example: 4
  *                         confirmed:
  *                           type: integer
- *                           example: 1
- *                           description: Số đơn đã giao và đã xác nhận nhận hàng
+ *                           example: 20
  *                         cancelled:
  *                           type: integer
- *                           example: 0
- *                           description: Số đơn đã hủy
- *                     recent_orders:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           order_id:
- *                             type: integer
- *                             example: 91
- *                           order_code:
- *                             type: string
- *                             example: "ORD-1773278920610"
- *                           status:
- *                             type: string
- *                             example: "confirmed"
- *                           payment_status:
- *                             type: string
- *                             example: "paid"
- *                             description: |
- *                               Trạng thái thanh toán của đơn.
- *                               Ví dụ: unpaid, pending, paid
- *                           created_at:
- *                             type: string
- *                             format: date-time
- *                             example: "2026-03-12T01:28:40.608Z"
- *                           desired_date:
- *                             type: string
- *                             format: date-time
- *                             example: "2026-03-12T00:00:00.000Z"
- *                           fulfilled_at:
- *                             type: string
- *                             format: date-time
- *                             nullable: true
- *                             example: "2026-03-11T18:29:27.027Z"
- *                           total_amount:
- *                             type: number
- *                             example: 4000000
- *                             description: Tổng tiền của đơn hàng
- *                           total_items:
- *                             type: integer
- *                             example: 2
- *                             description: Số loại sản phẩm trong đơn
- *                           total_product_qty:
- *                             type: integer
- *                             example: 15
- *                             description: Tổng số lượng sản phẩm trong đơn
- *                           product_names:
- *                             type: string
- *                             example: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
- *                             description: Danh sách tên sản phẩm trong đơn
- *               example:
- *                 success: true
- *                 data:
- *                   summary:
- *                     paid_amount: 4000000
- *                     unpaid_amount: 8000000
- *                     total_orders: 3
- *                   cards:
- *                     pending: 1
- *                     approved: 0
- *                     processing: 0
- *                     fulfilled: 2
- *                     confirmed: 1
- *                     cancelled: 0
- *                   recent_orders:
- *                     - order_id: 91
- *                       order_code: "ORD-1773278920610"
- *                       status: "confirmed"
- *                       payment_status: "paid"
- *                       created_at: "2026-03-12T01:28:40.608Z"
- *                       desired_date: "2026-03-12T00:00:00.000Z"
- *                       fulfilled_at: "2026-03-11T18:29:27.027Z"
- *                       total_amount: 4000000
- *                       total_items: 2
- *                       total_product_qty: 15
- *                       product_names: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
+ *                           example: 6
+ *                     
+ *             example:
+ *               success: true
+ *               data:
+ *                 summary:
+ *                   paid_amount: 4000000
+ *                   unpaid_amount: 8000000
+ *                   total_orders: 36
+ *                 cards:
+ *                   pending: 1
+ *                   approved: 0
+ *                   processing: 5
+ *                   fulfilled: 4
+ *                   confirmed: 20
+ *                   cancelled: 6
+ *                 pagination:
+ *                   page: 1
+ *                   limit: 5
+ *                   total_items: 36
+ *                   total_pages: 8
+ *                   has_next_page: true
+ *                   has_prev_page: false
+ *                 recent_orders:
+ *                   - order_id: 91
+ *                     order_code: "ORD-1773278920610"
+ *                     status: "confirmed"
+ *                     payment_status: "paid"
+ *                     created_at: "2026-03-12T01:28:40.608Z"
+ *                     desired_date: "2026-03-12T00:00:00.000Z"
+ *                     fulfilled_at: "2026-03-11T18:29:27.027Z"
+ *                     total_amount: 4000000
+ *                     total_items: 2
+ *                     total_product_qty: 15
+ *                     product_names: "Bánh Trung Thu - Đậu Xanh 150g, Bánh Trung Thu - Thập Cẩm 150g"
+ *                   - order_id: 92
+ *                     order_code: "ORD-1773323847981"
+ *                     status: "processing"
+ *                     payment_status: "unpaid"
+ *                     created_at: "2026-03-12T13:58:21.246Z"
+ *                     desired_date: "2026-03-10T00:00:00.000Z"
+ *                     fulfilled_at: null
+ *                     total_amount: 960000
+ *                     total_items: 1
+ *                     total_product_qty: 20
+ *                     product_names: "Bánh Trung Thu - Đậu Xanh 150g"
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Không có quyền xem dashboard
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Không có quyền xem dashboard"
  *       500:
  *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Server error"
  */
 router.get("/franchiseStaff_dashboard", requireAuth, requireFranchiseStaff, Fdashboard);
 
@@ -1122,10 +1126,38 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  * /api/Franchise_ViewOrders:
  *   get:
  *     summary: Lấy danh sách đơn hàng của franchise store hiện tại
+ *     description: |
+ *       Lấy danh sách đơn hàng của cửa hàng franchise hiện tại, có hỗ trợ phân trang.
+ *       Kết quả bao gồm:
+ *       - thông tin cơ bản của đơn hàng
+ *       - trạng thái đơn
+ *       - trạng thái thanh toán
+ *       - tổng tiền
+ *       - số loại sản phẩm
+ *       - tổng số lượng sản phẩm
+ *       - danh sách tên sản phẩm
+ *       - chi tiết từng sản phẩm trong đơn
  *     tags:
  *       - Franchise
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Trang hiện tại
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *           minimum: 1
+ *         description: Số lượng đơn hàng mỗi trang
  *     responses:
  *       200:
  *         description: Lấy danh sách đơn hàng thành công
@@ -1143,22 +1175,19 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                     type: object
  *                     properties:
  *                       order_id:
- *                         type: string
- *                         example: "92"
+ *                         type: integer
+ *                         example: 92
  *                       order_code:
  *                         type: string
  *                         example: "ORD-1773323847981"
  *                       status:
  *                         type: string
  *                         example: "processing"
+ *                         description: Trạng thái đơn hàng
  *                       payment_status:
  *                         type: string
  *                         example: "unpaid"
- *                       paid_at:
- *                         type: string
- *                         format: date-time
- *                         nullable: true
- *                         example: null
+ *                         description: Trạng thái thanh toán
  *                       created_at:
  *                         type: string
  *                         format: date-time
@@ -1166,6 +1195,7 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                       desired_date:
  *                         type: string
  *                         format: date-time
+ *                         nullable: true
  *                         example: "2026-03-10T00:00:00.000Z"
  *                       fulfilled_at:
  *                         type: string
@@ -1173,19 +1203,24 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                         nullable: true
  *                         example: null
  *                       total_amount:
- *                         type: string
- *                         example: "960000"
+ *                         type: number
+ *                         example: 960000
+ *                         description: Tổng tiền đơn hàng
  *                       total_items:
  *                         type: integer
  *                         example: 1
+ *                         description: Số loại sản phẩm trong đơn
  *                       total_product_qty:
  *                         type: integer
  *                         example: 20
+ *                         description: Tổng số lượng sản phẩm trong đơn
  *                       product_names:
  *                         type: string
  *                         example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                         description: Danh sách tên sản phẩm trong đơn
  *                       product_details:
  *                         type: array
+ *                         description: Danh sách chi tiết sản phẩm trong đơn
  *                         items:
  *                           type: object
  *                           properties:
@@ -1195,6 +1230,9 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                             product_name:
  *                               type: string
  *                               example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                             uom:
+ *                               type: string
+ *                               example: "cái"
  *                             qty:
  *                               type: integer
  *                               example: 20
@@ -1204,41 +1242,88 @@ router.get("/CentralKitchenStaff_dashborad", requireAuth, requireKitchenStaff, C
  *                             line_total:
  *                               type: integer
  *                               example: 960000
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *                     total_items:
+ *                       type: integer
+ *                       example: 36
+ *                       description: Tổng số đơn hàng
+ *                     total_pages:
+ *                       type: integer
+ *                       example: 4
+ *                     has_next_page:
+ *                       type: boolean
+ *                       example: true
+ *                     has_prev_page:
+ *                       type: boolean
+ *                       example: false
  *             example:
  *               success: true
  *               data:
- *                 - order_id: "92"
+ *                 - order_id: 92
  *                   order_code: "ORD-1773323847981"
  *                   status: "processing"
  *                   payment_status: "unpaid"
- *                   paid_at: null
  *                   created_at: "2026-03-12T13:58:21.246Z"
  *                   desired_date: "2026-03-10T00:00:00.000Z"
  *                   fulfilled_at: null
- *                   total_amount: "960000"
+ *                   total_amount: 960000
  *                   total_items: 1
  *                   total_product_qty: 20
  *                   product_names: "Bánh Trung Thu - Đậu Xanh 150g"
  *                   product_details:
  *                     - product_id: 1
  *                       product_name: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       uom: "cái"
  *                       qty: 20
  *                       unit_price: 48000
  *                       line_total: 960000
+ *               pagination:
+ *                 page: 1
+ *                 limit: 10
+ *                 total_items: 36
+ *                 total_pages: 4
+ *                 has_next_page: true
+ *                 has_prev_page: false
  *       403:
  *         description: Không có quyền xem đơn
  *         content:
  *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Không có quyền xem đơn hàng"
  *             example:
  *               success: false
- *               message: "Không có quyền xem đơn"
+ *               message: "Không có quyền xem đơn hàng"
  *       500:
  *         description: Server error
  *         content:
  *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Server error"
  *             example:
  *               success: false
- *               message: "Lỗi server"
+ *               message: "Server error"
  */
 router.get("/Franchise_ViewOrders", requireAuth, requireFranchiseStaff, getOrders);
 
@@ -1291,7 +1376,7 @@ router.post("/orders", requireAuth, requireFranchiseStaff, orderController.creat
 /**
  * @swagger
  * /api/orders/{orderId}:
- *   delete:
+ *   patch:
  *     summary: Hủy/Xóa đơn hàng của franchise
  *     description: |
  *       Franchise staff được phép xóa đơn hàng của chính cửa hàng mình.
@@ -1376,7 +1461,7 @@ router.post("/orders", requireAuth, requireFranchiseStaff, orderController.creat
  *                   type: string
  *                   example: Lỗi server khi hủy đơn hàng
  */
-router.delete("/orders/:orderId", requireAuth, requireFranchiseStaff, orderController.cancelOrder);
+router.patch("/orders/:orderId", requireAuth, requireFranchiseStaff, orderController.cancelOrder);
 
 /**
  * @swagger
@@ -1541,44 +1626,124 @@ router.post("/centralKitchen/orders/:orderId/approve", requireAuth, requireKitch
 
 /**
  * @swagger
- * /api/centralKitchen/orders/{orderId}/reject:
- *   post:
- *     summary: Từ chối đơn (pending -> cancelled)
- *     tags: [Central Kitchen]
+ * /api/centralKitchen/View_orders:
+ *   get:
+ *     summary: Lấy danh sách đơn hàng của central kitchen
+ *     description: |
+ *       API dùng để lấy danh sách đơn hàng thuộc central kitchen đang đăng nhập.
+ *       Kết quả trả về bao gồm thông tin đơn hàng, chi nhánh franchise đặt đơn,
+ *       tổng tiền, tổng số lượng sản phẩm và danh sách chi tiết sản phẩm trong từng đơn.
+ *     tags:
+ *       - Central Kitchen
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: orderId
- *         required: true
- *         schema:
- *           type: integer
- *           example: 1
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [reason]
- *             properties:
- *               reason:
- *                 type: string
- *                 minLength: 3
- *                 example: "Không đủ nguyên liệu"
  *     responses:
  *       200:
- *         description: OK
- *       400:
- *         description: Bad Request
+ *         description: Lấy danh sách đơn hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       order_id:
+ *                         type: string
+ *                         example: "92"
+ *                       order_code:
+ *                         type: string
+ *                         example: "ORD-1773323847981"
+ *                       status:
+ *                         type: string
+ *                         example: "processing"
+ *                       payment_status:
+ *                         type: string
+ *                         example: "unpaid"
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-12T13:58:21.246Z"
+ *                       desired_date:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2026-03-10T00:00:00.000Z"
+ *                       fulfilled_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                         example: null
+ *                       franchise_store_id:
+ *                         type: string
+ *                         example: "1"
+ *                       franchise_store_name:
+ *                         type: string
+ *                         example: "Chi nhánh Quận 1"
+ *                       total_amount:
+ *                         type: string
+ *                         example: "960000"
+ *                       total_items:
+ *                         type: integer
+ *                         example: 1
+ *                       total_product_qty:
+ *                         type: integer
+ *                         example: 20
+ *                       product_names:
+ *                         type: string
+ *                         example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                       product_details:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             product_id:
+ *                               type: integer
+ *                               example: 1
+ *                             product_name:
+ *                               type: string
+ *                               example: "Bánh Trung Thu - Đậu Xanh 150g"
+ *                             qty:
+ *                               type: integer
+ *                               example: 20
+ *                             unit_price:
+ *                               type: integer
+ *                               example: 48000
+ *                             line_total:
+ *                               type: integer
+ *                               example: 960000
  *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       409:
- *         description: Conflict
+ *         description: Không có token hoặc token không hợp lệ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Unauthorized
+ *       500:
+ *         description: Lỗi server khi lấy danh sách đơn hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Server error
  */
-router.post("/centralKitchen/orders/:orderId/reject", requireAuth, requireKitchenStaff, CentralKitchen_NewOrder.rejectNewOrder);
+router.get("/centralKitchen/View_orders", requireAuth, requireKitchenStaff, CentralGetOrders);
 
 /**
  * @swagger
@@ -2138,6 +2303,65 @@ router.get("/centralKitchen/product-inventory", requireAuth, requireKitchenStaff
  */
 router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), Mdashboard);
 
+/**
+ * @swagger
+ * /api/admin/system_report:
+ *   get:
+ *     summary: Báo cáo hệ thống (Admin)
+ *     description: Cung cấp chỉ số tổng quan hệ thống theo UI báo cáo tổng hợp.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy báo cáo hệ thống thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 summary_cards:
+ *                   users:
+ *                     active: 5
+ *                     total: 6
+ *                   franchise_stores:
+ *                     active: 3
+ *                     total: 4
+ *                   total_orders: 11
+ *                   total_stock: 1145
+ *                 financial:
+ *                   paid_amount: 13000000
+ *                   unpaid_amount: 39600000
+ *                   total_order_value: 126350000
+ *                   collection_rate: 10
+ *                 order_status:
+ *                   pending: 1
+ *                   approved: 1
+ *                   processing: 8
+ *                   fulfilled: 5
+ *                   confirmed: 0
+ *                   cancelled: 1
+ *                 store_report:
+ *                   - franchise_store_id: 1
+ *                     store_name: "Chi nhanh Quan 1"
+ *                     total_orders: 6
+ *                     total_value: 78700000
+ *                     paid_amount: 4000000
+ *                     unpaid_amount: 39000000
+ *                 role_distribution:
+ *                   - role: "franchise_staff"
+ *                     total: 2
+ *                     active: 1
+ *                     inactive: 1
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
+router.get("/admin/system_report", requireAuth, requireRole("admin"), systemReport);
+
 router.get("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), getMaterialById);
 router.get("/manager/material-types", requireAuth, requireRole("manager", "admin"), getMaterialTypes);
 router.post("/manager/materials", requireAuth, requireRole("manager", "admin"), createMaterial);
@@ -2163,7 +2387,8 @@ router.get("/manager/product_inventory", requireAuth, requireRole("manager", "ad
  * @swagger
  * /api/Manager_create_products:
  *   post:
- *     summary: Create a new product with materials
+ *     summary: Tạo sản phẩm mới
+ *     description: API tạo sản phẩm mới. SKU sẽ được hệ thống tự động sinh, người dùng không cần nhập.
  *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
@@ -2177,7 +2402,6 @@ router.get("/manager/product_inventory", requireAuth, requireRole("manager", "ad
  *               - product_type_id
  *               - name
  *               - uom
- *               - sku
  *               - price
  *             properties:
  *               product_type_id:
@@ -2185,19 +2409,17 @@ router.get("/manager/product_inventory", requireAuth, requireRole("manager", "ad
  *                 example: 1
  *               name:
  *                 type: string
- *                 example: Bánh Trung Thu - Đậu Xanh 150g
+ *                 example: Bánh Trung Thu Đậu vàng 150g
  *               uom:
  *                 type: string
  *                 example: cái
- *               sku:
- *                 type: string
- *                 example: SKU-MC-MUNG-150
  *               price:
  *                 type: number
- *                 example: 45000
+ *                 format: float
+ *                 example: 48000
  *               description:
  *                 type: string
- *                 example: Bánh trung thu nhân đậu xanh truyền thống
+ *                 example: Bánh trung thu nhân đậu vàng
  *               materials:
  *                 type: array
  *                 items:
@@ -2212,22 +2434,112 @@ router.get("/manager/product_inventory", requireAuth, requireRole("manager", "ad
  *                       example: 1
  *                     qty_required:
  *                       type: number
- *                       example: 0.05
+ *                       format: float
+ *                       example: 0.2
  *                     uom:
  *                       type: string
  *                       example: kg
  *                     note:
  *                       type: string
- *                       example: Bột mì làm vỏ bánh
+ *                       example: Bột mì
+ *           example:
+ *             product_type_id: 1
+ *             name: Bánh Trung Thu Đậu vàng 150g
+ *             uom: cái
+ *             price: 48000
+ *             description: Bánh trung thu nhân đậu vàng
+ *             materials:
+ *               - material_id: 1
+ *                 qty_required: 0.2
+ *                 uom: kg
+ *                 note: Bột mì
+ *               - material_id: 2
+ *                 qty_required: 0.1
+ *                 uom: kg
+ *                 note: Đậu vàng
  *     responses:
  *       201:
- *         description: Product created successfully
+ *         description: Tạo sản phẩm thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Tạo sản phẩm thành công
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     product_id:
+ *                       type: string
+ *                       example: "11"
+ *                     product_type_id:
+ *                       type: string
+ *                       example: "1"
+ *                     name:
+ *                       type: string
+ *                       example: Bánh Trung Thu Đậu vàng 150g
+ *                     uom:
+ *                       type: string
+ *                       example: cái
+ *                     sku:
+ *                       type: string
+ *                       example: SKU-000010
+ *                     price:
+ *                       type: string
+ *                       example: "48000.00"
+ *                     description:
+ *                       type: string
+ *                       example: Bánh trung thu nhân đậu vàng
+ *                     is_active:
+ *                       type: boolean
+ *                       example: true
  *       400:
- *         description: Invalid input
- *       401:
- *         description: Unauthorized
+ *         description: Dữ liệu đầu vào không hợp lệ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: product_type_id, name, uom, price là bắt buộc
+ *       403:
+ *         description: Không có quyền tạo sản phẩm
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: Forbidden
  *       500:
- *         description: Server error
+ *         description: Lỗi server khi tạo sản phẩm
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Lỗi server khi tạo sản phẩm
  */
 router.post("/Manager_create_products", requireAuth, requireRole("manager", "admin"), ManagerProductController.createProduct);
 
@@ -2280,7 +2592,7 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  * @swagger
  * /api/Manager_update_products/{id}:
  *   put:
- *     summary: Update product information and materials
+ *     summary: Update product information, materials, and inventory details
  *     tags: [Manager]
  *     security:
  *       - bearerAuth: []
@@ -2307,9 +2619,6 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  *               uom:
  *                 type: string
  *                 example: cái
- *               sku:
- *                 type: string
- *                 example: SKU-MC-MUNG-150
  *               price:
  *                 type: number
  *                 example: 48000
@@ -2319,6 +2628,18 @@ router.get("/Manager_view_detail_products/:id", requireAuth, requireRole("manage
  *               is_active:
  *                 type: boolean
  *                 example: true
+ *               expiry_date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-12-31"
+ *               on_hand_qty:
+ *                 type: number
+ *                 format: float
+ *                 example: 100
+ *               min_qty:
+ *                 type: number
+ *                 format: float
+ *                 example: 10
  *               materials:
  *                 type: array
  *                 items:
@@ -2507,6 +2828,101 @@ router.patch("/Manager_comfirmPaymentOrder/orders/:orderId", requireAuth, requir
 
 /**
  * @swagger
+ * /api/dashboard-admin:
+ *   get:
+ *     summary: Dashboard admin
+ *     description: Lấy dữ liệu tổng quan hệ thống cho tài khoản admin.
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy dữ liệu dashboard admin thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     users:
+ *                       type: object
+ *                       properties:
+ *                         active:
+ *                           type: integer
+ *                           example: 5
+ *                         total:
+ *                           type: integer
+ *                           example: 10
+ *                         list:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               user_id:
+ *                                 type: integer
+ *                                 example: 1
+ *                               username:
+ *                                 type: string
+ *                                 example: "admin"
+ *                               email:
+ *                                 type: string
+ *                                 example: "admin@franchise.com"
+ *                               status:
+ *                                 type: string
+ *                                 example: "active"
+ *                               role:
+ *                                 type: string
+ *                                 example: "admin"
+ *                               franchise_store_id:
+ *                                 type: integer
+ *                                 nullable: true
+ *                                 example: null
+ *                               central_kitchen_id:
+ *                                 type: integer
+ *                                 nullable: true
+ *                                 example: null
+ *                               created_at:
+ *                                 type: string
+ *                                 format: date-time
+ *                                 example: "2026-03-10T21:26:31.257Z"
+ *                               last_login_at:
+ *                                 type: string
+ *                                 format: date-time
+ *                                 nullable: true
+ *                                 example: "2026-03-10T22:10:00.000Z"
+ *                     contents:
+ *                       type: object
+ *                       properties:
+ *                         products:
+ *                           type: integer
+ *                           example: 13
+ *                         stores:
+ *                           type: integer
+ *                           example: 6
+ *                         central_kitchens:
+ *                           type: integer
+ *                           example: 2
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *       401:
+ *         description: Unauthorized (không có token / token sai)
+ *       403:
+ *         description: Không có quyền truy cập
+ *       500:
+ *         description: Server error
+ */
+router.get('/dashboard-admin', requireAuth, requireRole("admin"), admin_dashboard.getAdmminDashboardStats);
+
+/**
+ * @swagger
  * tags:
  *   - name: Admin
  *     description: Admin user management APIs
@@ -2578,6 +2994,185 @@ router.patch("/Manager_comfirmPaymentOrder/orders/:orderId", requireAuth, requir
  *         description: Server/DB error
  */
 router.get("/admin/users", requireAuth, requireRole("admin"), adminUserController.listUsers);
+
+/**
+ * @swagger
+ * /api/admin/users:
+ *   post:
+ *     summary: Tạo mới người dùng
+ *     description: Admin tạo user mới và phân role cho manager, admin, franchise_staff hoặc kitchen_staff. Khi tạo franchise_staff, hệ thống đồng bộ email và manager_name sang franchise_store.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 example: "Nguyễn Văn A"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "user@example.com"
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *                 example: "123456"
+ *               role:
+ *                 type: string
+ *                 enum: [user, manager, admin, franchise_staff, kitchen_staff]
+ *                 default: user
+ *                 example: "franchise_staff"
+ *               franchise_store_id:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: Bắt buộc khi role = franchise_staff
+ *                 example: 1
+ *               central_kitchen_id:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: Bắt buộc khi role = kitchen_staff
+ *                 example: 2
+ *           examples:
+ *             franchiseStaff:
+ *               summary: Tạo nhân viên cửa hàng
+ *               value:
+ *                 username: "Nguyễn Văn A"
+ *                 email: "user@example.com"
+ *                 password: "123456"
+ *                 role: "franchise_staff"
+ *                 franchise_store_id: 1
+ *             kitchenStaff:
+ *               summary: Tạo nhân viên bếp trung tâm
+ *               value:
+ *                 username: "Trần Văn B"
+ *                 email: "kitchen@example.com"
+ *                 password: "123456"
+ *                 role: "kitchen_staff"
+ *                 central_kitchen_id: 2
+ *             manager:
+ *               summary: Tạo manager
+ *               value:
+ *                 username: "Lê Thị C"
+ *                 email: "manager@example.com"
+ *                 password: "123456"
+ *                 role: "manager"
+ *     responses:
+ *       200:
+ *         description: Tạo user thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user_id:
+ *                       type: integer
+ *                       example: 10
+ *                     username:
+ *                       type: string
+ *                       example: "Nguyễn Văn A"
+ *                     email:
+ *                       type: string
+ *                       example: "user@example.com"
+ *                     status:
+ *                       type: string
+ *                       example: "active"
+ *                     role:
+ *                       type: string
+ *                       enum: [user, manager, admin, franchise_staff, kitchen_staff]
+ *                       example: "franchise_staff"
+ *                     manager_code:
+ *                       type: string
+ *                       nullable: true
+ *                       example: "MG-10"
+ *                     franchise_store_id:
+ *                       type: integer
+ *                       nullable: true
+ *                       example: 1
+ *                     franchise_staff_code:
+ *                       type: string
+ *                       nullable: true
+ *                       example: "FS-STAFF-10"
+ *                     central_kitchen_id:
+ *                       type: integer
+ *                       nullable: true
+ *                       example: null
+ *                     kitchen_staff_code:
+ *                       type: string
+ *                       nullable: true
+ *                       example: null
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-03-22T09:37:38.783Z"
+ *                     last_login_at:
+ *                       type: string
+ *                       format: date-time
+ *                       nullable: true
+ *                       example: null
+ *                 message:
+ *                   type: string
+ *                   example: "Tạo user thành công"
+ *       400:
+ *         description: Validation error hoặc email đã tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: "username, email và password là bắt buộc"
+ *                 error_code:
+ *                   type: string
+ *                   example: "VALIDATION_ERROR"
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Không tìm thấy franchise_store_id hoặc central_kitchen_id
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: "franchise_store_id không tồn tại"
+ *                 error_code:
+ *                   type: string
+ *                   example: "NOT_FOUND"
+ *       500:
+ *         description: Server/DB error
+ */
+router.post("/admin/users", requireAuth, requireRole("admin"), adminUserController.createUser);
 
 /**
  * @swagger
@@ -2755,5 +3350,508 @@ router.patch("/admin/users/:userId/reset-password", requireAuth, requireRole("ad
  *         description: Server/DB error
  */
 router.patch("/admin/users/:userId/status", requireAuth, requireRole("admin"), adminUserController.updateUserStatus);
+
+/**
+ * @swagger
+ * /admin/franchise_stores:
+ *   get:
+ *     tags:
+ *       - Admin
+ *     summary: Lấy danh sách tất cả các cửa hàng franchise
+ *     description: API này sẽ trả về tất cả các cửa hàng franchise có trong hệ thống.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Thành công, trả về danh sách cửa hàng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       franchise_store_id:
+ *                         type: integer
+ *                         description: ID của cửa hàng franchise
+ *                         example: 1
+ *                       store_code:
+ *                         type: string
+ *                         description: Mã cửa hàng
+ *                         example: "FS-001"
+ *                       name:
+ *                         type: string
+ *                         description: Tên cửa hàng
+ *                         example: "Chi Nhánh Quận 1"
+ *                       status:
+ *                         type: string
+ *                         description: Trạng thái của cửa hàng
+ *                         example: "active"
+ *                       address:
+ *                         type: string
+ *                         description: Địa chỉ cửa hàng
+ *                         example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                       email:
+ *                         type: string
+ *                         description: Email của cửa hàng
+ *                         example: "store1@franchise.com"
+ *                       manager_name:
+ *                         type: string
+ *                         description: Tên người quản lý cửa hàng
+ *                         example: "Nguyễn Văn A"
+ *       401:
+ *         description: Không có quyền truy cập
+ *       500:
+ *         description: Lỗi server
+ */
+router.get("/admin/franchise_stores", requireAuth, requireRole("admin"), adminStoreManager.getAllFranchiseStores);
+
+/**
+ * @swagger
+ * /admin/createfranchise_stores:
+ *   post:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Tạo mới cửa hàng franchise
+ *     description: API này tạo một cửa hàng franchise mới.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - store_code
+ *               - store_name
+ *               - store_address
+ *             properties:
+ *               store_code:
+ *                 type: string
+ *                 description: Mã cửa hàng
+ *                 example: "FS-001"
+ *               store_name:
+ *                 type: string
+ *                 description: Tên cửa hàng
+ *                 example: "Chi Nhánh Quận 1"
+ *               store_address:
+ *                 type: string
+ *                 description: Địa chỉ cửa hàng
+ *                 example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *     responses:
+ *       200:
+ *         description: Tạo cửa hàng thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     franchise_store_id:
+ *                       type: integer
+ *                       example: 1
+ *                     store_code:
+ *                       type: string
+ *                       example: "FS-001"
+ *                     name:
+ *                       type: string
+ *                       example: "Chi Nhánh Quận 1"
+ *                     address:
+ *                       type: string
+ *                       example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                     status:
+ *                       type: string
+ *                       example: "active"
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2026-03-22T16:15:00.000Z"
+ *                 message:
+ *                   type: string
+ *                   example: "Tạo cửa hàng thành công"
+ *       400:
+ *         description: Validation error hoặc mã cửa hàng đã tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Mã cửa hàng này đã tồn tại"
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Server/DB error
+ */
+router.post("/admin/createfranchise_stores", requireAuth, requireRole("admin"), adminStoreManager.createFranchiseStore);
+
+/**
+ * @swagger
+ * /admin/franchise_stores/{store_id}:
+ *   put:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Cập nhật thông tin cửa hàng franchise
+ *     description: API này cập nhật thông tin cửa hàng theo store_id. Không hỗ trợ cập nhật số điện thoại và email.
+ *     parameters:
+ *       - in: path
+ *         name: store_id
+ *         required: true
+ *         description: ID cửa hàng cần cập nhật
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               store_code:
+ *                 type: string
+ *                 description: Mã cửa hàng
+ *                 example: "FS-001"
+ *               store_name:
+ *                 type: string
+ *                 description: Tên cửa hàng
+ *                 example: "Chi Nhánh Quận 1"
+ *               store_address:
+ *                 type: string
+ *                 description: Địa chỉ cửa hàng
+ *                 example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *             required:
+ *               - store_code
+ *               - store_name
+ *               - store_address
+ *     responses:
+ *       200:
+ *         description: Thành công, trả về thông tin cửa hàng đã cập nhật
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 franchise_store_id: 1
+ *                 store_code: "FS-001"
+ *                 name: "Chi Nhánh Quận 1"
+ *                 address: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                 status: "active"
+ *               message: "Cập nhật cửa hàng thành công"
+ *       400:
+ *         description: Thông tin gửi lên không hợp lệ hoặc mã cửa hàng đã tồn tại
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Cửa hàng không tồn tại
+ *       500:
+ *         description: Lỗi server
+ */
+router.put("/admin/franchise_stores/:store_id", requireAuth, requireRole("admin"), adminStoreManager.updateFranchiseStore);
+
+/**
+ * @swagger
+ * /admin/franchise_stores/{store_id}/status:
+ *   patch:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: [Admin Token]
+ *     summary: Cập nhật trạng thái cửa hàng franchise
+ *     description: API này sẽ cập nhật trạng thái tại một cửa hàng franchise (active/inactive).
+ *     parameters:
+ *       - in: path
+ *         name: store_id
+ *         required: true
+ *         description: ID của cửa hàng franchise cần cập nhật trạng thái
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *                 example: inactive
+ *     responses:
+ *       200:
+ *         description: Cập nhật trạng thái thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 franchise_store_id: 1
+ *                 store_code: "FS-001"
+ *                 name: "Chi Nhánh Quận 1"
+ *                 status: "inactive"
+ *                 address: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                 phone: "028-1234-5678"
+ *                 email: "store1@franchise.com"
+ *                 manager_name: "Nguyễn Văn A"
+ *               message: "Cập nhật trạng thái cửa hàng thành công."
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Cửa hàng không tồn tại
+ *       500:
+ *         description: Server/DB error
+ */
+router.patch("/admin/franchise_stores/:store_id/status", requireAuth, requireRole("admin"), adminStoreManager.updateStatus);
+
+/**
+ * @swagger
+ * /admin/central_kitchens:
+ *   get:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Lấy danh sách bếp trung tâm
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - central_kitchen_id: 1
+ *                   kitchen_code: "CK-001"
+ *                   kitchen_name: "Central Kitchen - Thu Duc"
+ *                   kitchen_status: "active"
+ *                   kitchen_address: "100 Lý Thường Kiệt, Quận 10"              
+ *                   kitchen_email: "kitchen@franchise.com"
+ *                   staff_count: 12
+ *                   capacity: 500
+ *               message: null
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Server/DB error
+ */
+router.get("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCentralKitchenManager.getAllCentralKitchens);
+
+/**
+ * @swagger
+ * /admin/central_kitchens:
+ *   post:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Tạo mới bếp trung tâm
+ *     description: API này tạo mới một bếp trung tâm với mã bếp, tên, địa chỉ, công suất sản xuất và số lượng nhân sự.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               kitchen_code:
+ *                 type: string
+ *                 description: Mã bếp trung tâm
+ *                 example: "CK-001"
+ *               kitchen_name:
+ *                 type: string
+ *                 description: Tên bếp trung tâm
+ *                 example: "Central Kitchen - Thu Duc"
+ *               kitchen_address:
+ *                 type: string
+ *                 description: Địa chỉ bếp trung tâm
+ *                 example: "100 Lý Thường Kiệt, Quận 10"
+ *               production_capacity:
+ *                 type: integer
+ *                 description: Công suất sản xuất
+ *                 example: 500
+ *               staff_count:
+ *                 type: integer
+ *                 description: Số lượng nhân sự
+ *                 example: 12
+ *             required:
+ *               - kitchen_code
+ *               - kitchen_name
+ *               - kitchen_address
+ *               - production_capacity
+ *               - staff_count
+ *     responses:
+ *       200:
+ *         description: Tạo bếp trung tâm thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 central_kitchen_id: 1
+ *                 kitchen_code: "CK-001"
+ *                 kitchen_name: "Central Kitchen - Thu Duc"
+ *                 kitchen_address: "100 Lý Thường Kiệt, Quận 10"
+ *                 kitchen_status: "active"
+ *                 production_capacity: 500
+ *                 staff_count: 12
+ *                 created_at: "2026-03-24T09:30:00.000Z"
+ *               message: "Tạo bếp trung tâm thành công"
+ *       400:
+ *         description: Thiếu thông tin bắt buộc hoặc mã bếp trung tâm đã tồn tại
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       500:
+ *         description: Lỗi server
+ */
+router.post("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCentralKitchenManager.createCentralKitchen);
+
+/**
+ * @swagger
+ * /admin/central_kitchens/{kitchen_id}:
+ *   put:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Cập nhật thông tin bếp trung tâm
+ *     description: API này cập nhật thông tin bếp trung tâm theo kitchen_id. Không hỗ trợ cập nhật số điện thoại và email.
+ *     parameters:
+ *       - in: path
+ *         name: kitchen_id
+ *         required: true
+ *         description: ID bếp trung tâm cần cập nhật
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               kitchen_code:
+ *                 type: string
+ *                 description: Mã bếp trung tâm
+ *                 example: "CK-001"
+ *               kitchen_name:
+ *                 type: string
+ *                 description: Tên bếp trung tâm
+ *                 example: "Central Kitchen - Thu Duc"
+ *               kitchen_address:
+ *                 type: string
+ *                 description: Địa chỉ bếp trung tâm
+ *                 example: "100 Lý Thường Kiệt, Quận 10"
+ *               production_capacity:
+ *                 type: integer
+ *                 description: Công suất sản xuất (số đơn vị/ngày)
+ *                 example: 500
+ *               staff_count:
+ *                 type: integer
+ *                 description: Số lượng nhân sự
+ *                 example: 12
+ *             required:
+ *               - kitchen_code
+ *               - kitchen_name
+ *               - kitchen_address
+ *               - production_capacity
+ *               - staff_count
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 central_kitchen_id: 1
+ *                 kitchen_code: "CK-001"
+ *                 kitchen_name: "Central Kitchen - Thu Duc"
+ *                 kitchen_status: "active"
+ *                 kitchen_address: "100 Lý Thường Kiệt, Quận 10"
+ *                 production_capacity: 500
+ *                 staff_count: 12
+ *               message: "Cập nhật bếp trung tâm thành công"
+ *       400:
+ *         description: Thông tin gửi lên không hợp lệ hoặc mã bếp trung tâm đã tồn tại
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - yêu cầu role admin
+ *       404:
+ *         description: Bếp trung tâm không tồn tại
+ *       500:
+ *         description: Lỗi server
+ */
+router.put("/admin/central_kitchens/:kitchen_id", requireAuth, requireRole("admin"), adminCentralKitchenManager.updateCentralKitchen);
+
+/**
+ * @swagger
+ * /admin/central_kitchens/{kitchen_id}/status:
+ *   patch:
+ *     tags:
+ *       - Admin
+ *     security:
+ *       - bearerAuth: []
+ *     summary: Cập nhật trạng thái bếp trung tâm
+ *     parameters:
+ *       - in: path
+ *         name: kitchen_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID bếp trung tâm
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive]
+ *     responses:
+ *       200:
+ *         description: Cập nhật trạng thái thành công
+ *       404:
+ *         description: Không tìm thấy bếp trung tâm
+ *       500:
+ *         description: Server error
+ */
+router.patch("/admin/central_kitchens/:kitchen_id/status", requireAuth, requireRole("admin"), adminCentralKitchenManager.updateStatus);
 
 module.exports = router;

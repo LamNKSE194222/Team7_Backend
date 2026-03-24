@@ -198,7 +198,12 @@ async function listOrders(req, res) {
                 COALESCE(
                     STRING_AGG(DISTINCT p.name, ', ' ORDER BY p.name),
                     ''
-                ) AS product_names
+                ) AS product_names,
+
+                COALESCE(
+                    STRING_AGG(p.uom, ', ' ORDER BY p.uom),
+                    ''
+                ) AS product_uoms
             FROM orders o
             LEFT JOIN order_item oi
                 ON oi.order_id = o.order_id
