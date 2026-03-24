@@ -34,7 +34,8 @@ async function login(req, res) {
                 ck.status AS central_kitchen_status,
 
                 m.manager_code,
-                m.is_admin
+                m.is_admin,
+                m.central_kitchen_id AS manager_central_kitchen_id
             FROM "user" u
             LEFT JOIN franchise_staff fs 
                 ON fs.user_id = u.user_id
@@ -126,13 +127,16 @@ async function login(req, res) {
         );
 
         let role = "user";
+        let central_kitchen_id = null;
 
         if (user.manager_code) {
             role = user.is_admin ? "admin" : "manager";
+            central_kitchen_id = user.manager_central_kitchen_id;
         } else if (user.franchise_store_id) {
             role = "franchise_staff";
         } else if (user.central_kitchen_id) {
             role = "kitchen_staff";
+            central_kitchen_id = user.central_kitchen_id;
         }
 
         const token = jwt.sign(
@@ -140,7 +144,7 @@ async function login(req, res) {
                 user_id: user.user_id,
                 role,
                 franchise_store_id: user.franchise_store_id ?? null,
-                central_kitchen_id: user.central_kitchen_id ?? null,
+                central_kitchen_id: central_kitchen_id,
                 manager_code: user.manager_code ?? null,
                 is_admin: user.manager_code ? !!user.is_admin : null,
             },
@@ -159,7 +163,7 @@ async function login(req, res) {
                     role,
                     status: user.user_status,
                     franchise_store_id: user.franchise_store_id ?? null,
-                    central_kitchen_id: user.central_kitchen_id ?? null,
+                    central_kitchen_id: central_kitchen_id,
                 },
             },
             message: null,
