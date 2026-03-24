@@ -7,6 +7,7 @@ async function getMaterialById(req, res) {
 
         const rs = await pool.query(`
             SELECT
+                ckii.inventory_item_id,
                 m.material_id,
                 m.name,
                 m.material_code,
@@ -22,7 +23,7 @@ async function getMaterialById(req, res) {
                 ON mt.materials_type_id = m.materials_type_id
             LEFT JOIN central_kitchen_inventory_item ckii
                 ON ckii.material_id = m.material_id
-            WHERE m.material_id = $1
+            WHERE ckii.inventory_item_id = $1
             LIMIT 1
         `, [id]);
 
@@ -55,13 +56,13 @@ async function createMaterial(req, res) {
             min_stock,
             on_hand_qty,
             expiry_date,
-            central_kitchen_id
+            central_kitchen_id,
         } = req.body;
 
         // 1. Insert material
         const materialRs = await client.query(`
-            INSERT INTO material (name, material_code, uom, materials_type_id, cost_price, min_stock, is_active)
-            VALUES ($1, $2, $3, $4, $5, $6, true)
+            INSERT INTO material (name, material_code, uom, materials_type_id, cost_price, min_stock)
+            VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
         `, [name, material_code, uom, materials_type_id, cost_price, min_stock]);
 
@@ -117,6 +118,7 @@ async function updateMaterial(req, res) {
 
         const {
             name,
+            material_code,
             uom,
             materials_type_id,
             cost_price,
@@ -127,41 +129,43 @@ async function updateMaterial(req, res) {
             central_kitchen_id
         } = req.body;
 
+        // 0. Tìm material_id từ inventory_item_id
+        const materialIdRs = await client.query(`
+            SELECT material_id FROM central_kitchen_inventory_item
+            WHERE inventory_item_id = $1
+        `, [id]);
+
+        if (materialIdRs.rows.length === 0) {
+            throw new Error("Không tìm thấy nguyên liệu trong kho");
+        }
+        const material_id = materialIdRs.rows[0].material_id;
+
         // 1. update material
         await client.query(`
             UPDATE material
             SET name = $1,
                 uom = $2,
-                materials_type_id = $3,
-                cost_price = $4,
-                min_stock = $5,
-                is_active = $6
-            WHERE material_id = $7
-        `, [name, uom, materials_type_id, cost_price, min_stock, is_active, id]);
+                material_code = $3,
+                materials_type_id = $4,
+                cost_price = $5,
+                min_stock = $6,
+                is_active = $7
+            WHERE material_id = $8
+        `, [name, uom, material_code, materials_type_id, cost_price, min_stock, is_active, material_id]);
 
-        // 2. lấy inventory_id
-        const inventoryRs = await client.query(`
-            SELECT inventory_id
-            FROM central_kitchen_inventory
-            WHERE central_kitchen_id = $1
-        `, [central_kitchen_id]);
-
-        const inventory_id = inventoryRs.rows[0].inventory_id;
-
-        // 3. update inventory item
+        // 2. update inventory item
         await client.query(`
             UPDATE central_kitchen_inventory_item
             SET on_hand_qty = $1,
                 expiry_date = $2
-            WHERE material_id = $3
-              AND inventory_id = $4
-        `, [on_hand_qty, expiry_date, id, inventory_id]);
+            WHERE inventory_item_id = $3
+        `, [on_hand_qty, expiry_date, id]);
 
         await client.query("COMMIT");
 
         return res.json({
             success: true,
-            message: "Updated"
+            message: "Updated successfully"
         });
 
     } catch (err) {
@@ -184,7 +188,10 @@ async function deleteMaterial(req, res) {
         await pool.query(`
             UPDATE material
             SET is_active = false
-            WHERE material_id = $1
+            WHERE material_id = (
+                SELECT material_id FROM central_kitchen_inventory_item
+                WHERE inventory_item_id = $1
+            )
         `, [id]);
 
         return res.json({ success: true, message: "Deleted" });
@@ -209,10 +216,26 @@ async function getMaterialTypes(req, res) {
     }
 }
 
+async function getCentralKitchens(req, res) {
+    try {
+        const rs = await pool.query(`
+            SELECT central_kitchen_id, name
+            FROM central_kitchen
+            WHERE status = 'active'
+            ORDER BY name ASC
+        `);
+        return res.json({ success: true, data: rs.rows });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+}
+
 module.exports = {
     getMaterialById,
     createMaterial,
     updateMaterial,
     deleteMaterial,
-    getMaterialTypes
+    getMaterialTypes,
+    getCentralKitchens
 };

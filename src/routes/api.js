@@ -22,7 +22,7 @@ const { Mdashboard } = require("../controllers/manager_dashboardController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
 const manager_accept_payment = require("../controllers/manager_accept_payment");
-const { getMaterialById, createMaterial, updateMaterial, deleteMaterial, getMaterialTypes } = require("../controllers/manager_materialController");
+const { getMaterialById, createMaterial, updateMaterial, deleteMaterial, getMaterialTypes, getCentralKitchens } = require("../controllers/manager_materialController");
 
 /**
  * @swagger
@@ -2143,6 +2143,8 @@ router.get("/manager/material-types", requireAuth, requireRole("manager", "admin
 router.post("/manager/materials", requireAuth, requireRole("manager", "admin"), createMaterial);
 router.put("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), updateMaterial);
 router.delete("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), deleteMaterial);
+
+router.get("/manager/central-kitchens", requireAuth, requireRole("manager", "admin"), getCentralKitchens);
 
 /**
  * @swagger
