@@ -3379,10 +3379,6 @@ router.patch("/admin/users/:userId/status", requireAuth, requireRole("admin"), a
  *                         type: string
  *                         description: Địa chỉ cửa hàng
  *                         example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
- *                       phone:
- *                         type: string
- *                         description: Số điện thoại cửa hàng
- *                         example: "028-1234-5678"
  *                       email:
  *                         type: string
  *                         description: Email của cửa hàng
@@ -3639,8 +3635,7 @@ router.patch("/admin/franchise_stores/:store_id/status", requireAuth, requireRol
  *                   kitchen_code: "CK-001"
  *                   kitchen_name: "Central Kitchen - Thu Duc"
  *                   kitchen_status: "active"
- *                   kitchen_address: "100 Lý Thường Kiệt, Quận 10"
- *                   kitchen_phone: "028-5555-1234"
+ *                   kitchen_address: "100 Lý Thường Kiệt, Quận 10"              
  *                   kitchen_email: "kitchen@franchise.com"
  *                   staff_count: 12
  *                   capacity: 500

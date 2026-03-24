@@ -23,9 +23,15 @@ async function requireKitchenStaff(req, res, next) {
 
         const rs = await pool.query(
             `
-            SELECT user_id, central_kitchen_id, status
-            FROM kitchen_staff
-            WHERE user_id = $1
+            SELECT
+                ks.user_id,
+                ks.central_kitchen_id,
+                ks.status AS staff_status,
+                ck.status AS kitchen_status
+            FROM kitchen_staff ks
+            JOIN central_kitchen ck
+                ON ck.central_kitchen_id = ks.central_kitchen_id
+            WHERE ks.user_id = $1
             `,
             [userId]
         );
@@ -38,11 +44,19 @@ async function requireKitchenStaff(req, res, next) {
             });
         }
 
-        if (rs.rows[0].status !== "active") {
+        if (rs.rows[0].staff_status !== "active") {
             return res.status(403).json({
                 success: false,
                 message: "Kitchen staff inactive",
                 error_code: "STAFF_INACTIVE"
+            });
+        }
+
+        if (rs.rows[0].kitchen_status !== "active") {
+            return res.status(403).json({
+                success: false,
+                message: "Central kitchen inactive",
+                error_code: "CENTRAL_KITCHEN_INACTIVE"
             });
         }
 

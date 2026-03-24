@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 
-//Login user
+// Login user
 async function login(req, res) {
     try {
         const { email, password } = req.body || {};
@@ -15,25 +15,41 @@ async function login(req, res) {
             });
         }
 
-        // Lấy user + phân quyền
         const rs = await pool.query(
             `
-      SELECT 
-        u.user_id,
-        u.username,
-        u.email,
-        u.password AS password_hash,
-        u.status,
-        fs.franchise_store_id,
-        ks.central_kitchen_id,
-        m.manager_code,
-        m.is_admin
-      FROM "user" u
-      LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
-      LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
-      LEFT JOIN manager m ON m.user_id = u.user_id
-      WHERE u.email = $1
-      `,
+            SELECT 
+                u.user_id,
+                u.username,
+                u.email,
+                u.password AS password_hash,
+                u.status AS user_status,
+
+                fs.franchise_store_id,
+                fs.status AS franchise_staff_status,
+
+                fstore.status AS franchise_store_status,
+
+                ks.central_kitchen_id,
+                ks.status AS kitchen_staff_status,
+
+                ck.status AS central_kitchen_status,
+
+                m.manager_code,
+                m.is_admin
+            FROM "user" u
+            LEFT JOIN franchise_staff fs 
+                ON fs.user_id = u.user_id
+            LEFT JOIN franchise_store fstore 
+                ON fstore.franchise_store_id = fs.franchise_store_id
+            LEFT JOIN kitchen_staff ks 
+                ON ks.user_id = u.user_id
+            LEFT JOIN central_kitchen ck 
+                ON ck.central_kitchen_id = ks.central_kitchen_id
+            LEFT JOIN manager m 
+                ON m.user_id = u.user_id
+            WHERE u.email = $1
+            LIMIT 1
+            `,
             [email]
         );
 
@@ -48,13 +64,48 @@ async function login(req, res) {
 
         const user = rs.rows[0];
 
-        // status enum: active / inactive
-        if (user.status !== "active") {
+        if (user.user_status !== "active") {
             return res.status(403).json({
                 success: false,
                 data: null,
                 message: "Tài khoản đang inactive",
                 error_code: "USER_INACTIVE",
+            });
+        }
+
+        if (user.franchise_store_id && user.franchise_staff_status !== "active") {
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Nhân viên cửa hàng đang inactive",
+                error_code: "FRANCHISE_STAFF_INACTIVE",
+            });
+        }
+
+        if (user.franchise_store_id && user.franchise_store_status !== "active") {
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Cửa hàng đang inactive, không thể đăng nhập",
+                error_code: "STORE_INACTIVE",
+            });
+        }
+
+        if (user.central_kitchen_id && user.kitchen_staff_status !== "active") {
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Nhân viên bếp đang inactive",
+                error_code: "KITCHEN_STAFF_INACTIVE",
+            });
+        }
+
+        if (user.central_kitchen_id && user.central_kitchen_status !== "active") {
+            return res.status(403).json({
+                success: false,
+                data: null,
+                message: "Bếp trung tâm đang inactive, không thể đăng nhập",
+                error_code: "CENTRAL_KITCHEN_INACTIVE",
             });
         }
 
@@ -67,12 +118,12 @@ async function login(req, res) {
                 error_code: "INVALID_LOGIN",
             });
         }
+
         await pool.query(
             `UPDATE "user" SET last_login_at = NOW() WHERE user_id = $1`,
             [user.user_id]
         );
 
-        //phân quyền
         let role = "user";
 
         if (user.manager_code) {
@@ -105,7 +156,7 @@ async function login(req, res) {
                     username: user.username,
                     email: user.email,
                     role,
-                    status: user.status,
+                    status: user.user_status,
                     franchise_store_id: user.franchise_store_id ?? null,
                     central_kitchen_id: user.central_kitchen_id ?? null,
                 },
@@ -125,7 +176,6 @@ async function login(req, res) {
 
 async function me(req, res) {
     try {
-        // requireAuth phải gán req.user từ token
         const userId = req.user?.user_id;
 
         if (!userId) {
@@ -137,42 +187,41 @@ async function me(req, res) {
             });
         }
 
-        // Lấy thông tin profile đầy đủ từ DB
         const rs = await pool.query(
             `
-      SELECT
-        u.user_id,
-        u.username,
-        u.email,
-        u.status,
+            SELECT
+                u.user_id,
+                u.username,
+                u.email,
+                u.status,
 
-        fs.franchise_store_id,
-        fstore.store_code AS franchise_store_code,
-        fstore.name       AS franchise_store_name,
-        fs.staff_code     AS franchise_staff_code,
-        fs.status         AS franchise_staff_status,
+                fs.franchise_store_id,
+                fstore.store_code AS franchise_store_code,
+                fstore.name       AS franchise_store_name,
+                fs.staff_code     AS franchise_staff_code,
+                fs.status         AS franchise_staff_status,
 
-        ks.central_kitchen_id,
-        ck.kitchen_code   AS central_kitchen_code,
-        ck.name           AS central_kitchen_name,
-        ks.staff_code     AS kitchen_staff_code,
-        ks.status         AS kitchen_staff_status,
-        
-        m.manager_code,
-        m.is_admin
+                ks.central_kitchen_id,
+                ck.kitchen_code   AS central_kitchen_code,
+                ck.name           AS central_kitchen_name,
+                ks.staff_code     AS kitchen_staff_code,
+                ks.status         AS kitchen_staff_status,
+                
+                m.manager_code,
+                m.is_admin
 
-      FROM "user" u
-      LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
-      LEFT JOIN franchise_store fstore ON fstore.franchise_store_id = fs.franchise_store_id
+            FROM "user" u
+            LEFT JOIN franchise_staff fs ON fs.user_id = u.user_id
+            LEFT JOIN franchise_store fstore ON fstore.franchise_store_id = fs.franchise_store_id
 
-      LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
-      LEFT JOIN central_kitchen ck ON ck.central_kitchen_id = ks.central_kitchen_id
-      
-      LEFT JOIN manager m ON m.user_id = u.user_id
+            LEFT JOIN kitchen_staff ks ON ks.user_id = u.user_id
+            LEFT JOIN central_kitchen ck ON ck.central_kitchen_id = ks.central_kitchen_id
+            
+            LEFT JOIN manager m ON m.user_id = u.user_id
 
-      WHERE u.user_id = $1
-      LIMIT 1
-      `,
+            WHERE u.user_id = $1
+            LIMIT 1
+            `,
             [userId]
         );
 
@@ -187,13 +236,11 @@ async function me(req, res) {
 
         const u = rs.rows[0];
 
-        // Xác định role (ưu tiên franchise_staff nếu có, nếu không thì kitchen_staff)
         let role = "user";
         if (u.manager_code) role = u.is_admin ? "admin" : "manager";
         else if (u.franchise_store_id) role = "franchise_staff";
         else if (u.central_kitchen_id) role = "kitchen_staff";
 
-        // Chuẩn hóa data trả về cho FE (profile page dùng chung)
         const data = {
             user_id: String(u.user_id),
             username: u.username,
@@ -233,8 +280,6 @@ async function me(req, res) {
         });
     }
 }
-
-
 
 // Logout user
 async function logout(req, res) {
