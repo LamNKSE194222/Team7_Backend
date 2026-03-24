@@ -2,15 +2,14 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
 
-// Login user
 async function login(req, res) {
     try {
-        const { login, password } = req.body || {};
-        if (!login || !password) {
+        const { email, password } = req.body || {};
+        if (!email || !password) {
             return res.status(400).json({
                 success: false,
                 data: null,
-                message: "login và password là bắt buộc",
+                message: "email và password là bắt buộc",
                 error_code: "VALIDATION_ERROR",
             });
         }
@@ -47,35 +46,35 @@ async function login(req, res) {
                 ON ck.central_kitchen_id = ks.central_kitchen_id
             LEFT JOIN manager m 
                 ON m.user_id = u.user_id
-            WHERE u.username = $1 OR u.email = $1
+            WHERE u.email = $1
             LIMIT 1
             `,
-            [login]
+            [email]
         );
 
         if (rs.rowCount === 0) {
             return res.status(401).json({
                 success: false,
                 data: null,
-                message: "Sai tên đăng nhập hoặc mật khẩu",
+                message: "Email hoặc mật khẩu không đúng",
                 error_code: "INVALID_LOGIN",
             });
         }
 
         const user = rs.rows[0];
 
-        // check username/email + password trước
+        // check mật khẩu trước
         const ok = await bcrypt.compare(password, user.password_hash);
         if (!ok) {
             return res.status(401).json({
                 success: false,
                 data: null,
-                message: "Sai tên đăng nhập hoặc mật khẩu",
+                message: "Email hoặc mật khẩu không đúng",
                 error_code: "INVALID_LOGIN",
             });
         }
 
-        // sau khi đúng password mới check status
+        // đúng email + password rồi mới check status
         if (user.user_status !== "active") {
             return res.status(403).json({
                 success: false,
@@ -127,16 +126,13 @@ async function login(req, res) {
         );
 
         let role = "user";
-        let central_kitchen_id = null;
 
         if (user.manager_code) {
             role = user.is_admin ? "admin" : "manager";
-            central_kitchen_id = user.manager_central_kitchen_id;
         } else if (user.franchise_store_id) {
             role = "franchise_staff";
         } else if (user.central_kitchen_id) {
             role = "kitchen_staff";
-            central_kitchen_id = user.central_kitchen_id;
         }
 
         const token = jwt.sign(
@@ -144,7 +140,7 @@ async function login(req, res) {
                 user_id: user.user_id,
                 role,
                 franchise_store_id: user.franchise_store_id ?? null,
-                central_kitchen_id: central_kitchen_id,
+                central_kitchen_id: user.central_kitchen_id ?? null,
                 manager_code: user.manager_code ?? null,
                 is_admin: user.manager_code ? !!user.is_admin : null,
             },
