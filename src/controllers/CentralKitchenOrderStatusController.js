@@ -12,6 +12,7 @@ async function CentralGetOrders(req, res) {
                 o.created_at,
                 o.desired_date,
                 o.fulfilled_at,
+                o.note,
 
                 fs.franchise_store_id,
                 fs.name AS franchise_store_name,
@@ -54,6 +55,7 @@ async function CentralGetOrders(req, res) {
                 o.created_at,
                 o.desired_date,
                 o.fulfilled_at,
+                o.note,
                 fs.franchise_store_id,
                 fs.name
             ORDER BY o.created_at DESC
@@ -171,6 +173,7 @@ async function getFulfilledOrders(req, res) {
                 o.fulfilled_at,
                 o.received_confirmed_at,
                 o.franchise_store_id,
+                o.note,
                 fs.name AS store_name,
                 COUNT(oi.order_item_id) AS total_items,
                 STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names
@@ -190,6 +193,7 @@ async function getFulfilledOrders(req, res) {
                 o.fulfilled_at,
                 o.received_confirmed_at,
                 o.franchise_store_id,
+                o.note,
                 fs.name
             ORDER BY o.fulfilled_at DESC NULLS LAST, o.order_id DESC
             `,
@@ -229,6 +233,7 @@ async function getProcessingOrders(req, res) {
                 o.status,
                 o.created_at,
                 o.desired_date,
+                o.note,
                 COUNT(oi.order_item_id) AS total_items,
                 STRING_AGG(p.name, ', ' ORDER BY p.name) AS product_names
             FROM orders o
@@ -248,6 +253,7 @@ async function getProcessingOrders(req, res) {
                 o.central_kitchen_id,
                 o.status,
                 o.created_at,
+                o.note,
                 o.desired_date
             ORDER BY o.created_at DESC, o.order_id DESC
             `,
