@@ -25,6 +25,7 @@ const manager_accept_payment = require("../controllers/manager_accept_payment.js
 const admin_dashboard = require("../controllers/admin_dashboard.js")
 const adminStoreManager = require('../controllers/adminStoreManager');
 const adminCentralKitchenManager = require('../controllers/adminCentralKitchenManager');
+const { getMaterialById, createMaterial, updateMaterial, deleteMaterial, getMaterialTypes, getCentralKitchens } = require("../controllers/manager_materialController");
 
 /**
  * @swagger
@@ -2360,6 +2361,14 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
  *         description: Server error
  */
 router.get("/admin/system_report", requireAuth, requireRole("admin"), systemReport);
+
+router.get("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), getMaterialById);
+router.get("/manager/material-types", requireAuth, requireRole("manager", "admin"), getMaterialTypes);
+router.post("/manager/materials", requireAuth, requireRole("manager", "admin"), createMaterial);
+router.put("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), updateMaterial);
+router.delete("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), deleteMaterial);
+
+router.get("/manager/central-kitchens", requireAuth, requireRole("manager", "admin"), getCentralKitchens);
 
 /**
  * @swagger

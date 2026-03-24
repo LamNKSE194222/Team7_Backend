@@ -2,6 +2,7 @@ const pool = require("../config/database");
 
 async function Mdashboard(req, res) {
     try {
+        res.set("Cache-Control", "no-store");
         const role = req.user?.role;
         const allowed = ["manager", "admin"];
 
@@ -25,6 +26,7 @@ AND received_confirmed_at < date_trunc('month', CURRENT_DATE) + interval '1 mont
         const lowStockRs = await pool.query(
             `
 SELECT
+    ckii.inventory_item_id,
     m.material_id,
     m.name AS material_name,
     ckii.on_hand_qty,
@@ -35,6 +37,8 @@ FROM central_kitchen_inventory_item ckii
 JOIN material m ON m.material_id = ckii.material_id
 JOIN materials_type mt ON mt.materials_type_id = m.materials_type_id
 WHERE ckii.on_hand_qty <= $1
+  AND m.is_active = true
+  AND mt.is_active = true
 ORDER BY ckii.on_hand_qty ASC
 LIMIT 10
 `,
@@ -51,9 +55,12 @@ LIMIT 10
 
         // 4) Tổng tồn kho nguyên liệu của tất cả sản phẩm trong hệ thống (từ central_kitchen_inventory_item)
         const materialStockRs = await pool.query(`
-    SELECT COALESCE(SUM(on_hand_qty),0)::int AS total_material_stock
-    FROM central_kitchen_inventory_item
-`);
+            SELECT COALESCE(SUM(ckii.on_hand_qty),0)::int AS total_material_stock
+            FROM central_kitchen_inventory_item ckii
+            JOIN material m ON m.material_id = ckii.material_id
+            JOIN materials_type mt ON mt.materials_type_id = m.materials_type_id
+            WHERE m.is_active = true AND mt.is_active = true
+        `);
 
         const cards = {
             total_orders_month: statusRs.rows[0]?.total_orders || 0,
@@ -66,7 +73,10 @@ LIMIT 10
         const materialsInventoryRs = await pool.query(`
     SELECT
         ckii.inventory_item_id,
+        m.material_id,
         m.name AS material_name,
+        m.cost_price,
+        m.min_stock,
         ckii.on_hand_qty,
         ckii.expiry_date,
         m.uom,
@@ -75,9 +85,10 @@ LIMIT 10
             WHEN m.is_active = true AND mt.is_active = true THEN 'active'
             ELSE 'inactive'
         END AS status
-    FROM central_kitchen_inventory_item ckii
-    JOIN material m ON m.material_id = ckii.material_id
+    FROM material m
+    JOIN central_kitchen_inventory_item ckii ON ckii.material_id = m.material_id
     JOIN materials_type mt ON mt.materials_type_id = m.materials_type_id
+    WHERE m.is_active = true AND mt.is_active = true
     ORDER BY ckii.expiry_date ASC
     LIMIT 20
 `);
