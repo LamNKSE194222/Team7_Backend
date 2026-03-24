@@ -155,6 +155,12 @@ async function createOrder(req, res) {
             [order.order_id]
         );
 
+        // Gửi notification cho Central Kitchen
+        const notificationService = req.app.get('notificationService');
+        if (notificationService) {
+            await notificationService.notifyNewOrder(order.order_id);
+        }
+
         return res.status(201).json({
             success: true,
             data: {

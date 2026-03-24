@@ -76,7 +76,7 @@ async function CentralGetOrders(req, res) {
     }
 }
 
-  async function readyToDeliver(req, res) {
+async function readyToDeliver(req, res) {
     const { orderId } = req.params;
     const kitchenId = req.user.central_kitchen_id;
 
@@ -132,6 +132,12 @@ async function CentralGetOrders(req, res) {
         );
 
         await client.query("COMMIT");
+
+        // Gửi notification cho Franchise
+        const notificationService = req.app.get('notificationService');
+        if (notificationService) {
+            await notificationService.notifyOrderCompleted(orderId);
+        }
 
         return res.json({
             success: true,
