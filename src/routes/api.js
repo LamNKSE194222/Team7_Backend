@@ -19,7 +19,6 @@ const { getCentralKitchenProductInventory } = require("../controllers/centralKit
 const ManagerProductController = require("../controllers/manager_product_controller.js");
 const { Mdashboard } = require("../controllers/manager_dashboardController");
 const { systemReport } = require("../controllers/systemReportController");
-const systemSettingsController = require("../controllers/systemSettingsController");
 const { getManagerStorage } = require("../controllers/manager_inventoryController");
 const adminUserController = require("../controllers/adminUserController");
 const manager_accept_payment = require("../controllers/manager_accept_payment.js");
@@ -2364,92 +2363,6 @@ router.get("/admin/system_report", requireAuth, requireRole("admin"), systemRepo
 
 /**
  * @swagger
- * /api/admin/system_settings:
- *   get:
- *     summary: Lấy cài đặt hệ thống
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lấy cài đặt thành công
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       500:
- *         description: Server error
- */
-router.get("/admin/system_settings", requireAuth, requireRole("admin"), systemSettingsController.getSystemSettings);
-
-/**
- * @swagger
- * /api/admin/system_settings/update:
- *   put:
- *     summary: Cập nhật cài đặt hệ thống
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               company_name:
- *                 type: string
- *               timezone:
- *                 type: string
- *               currency:
- *                 type: string
- *               notifications:
- *                 type: object
- *                 properties:
- *                   low_stock_alert:
- *                     type: boolean
- *                   order_status_change_alert:
- *                     type: boolean
- *                   expiry_alert:
- *                     type: boolean
- *               email_config:
- *                 type: object
- *                 properties:
- *                   smtp_host:
- *                     type: string
- *                   smtp_port:
- *                     type: integer
- *                   smtp_user:
- *                     type: string
- *                   smtp_password:
- *                     type: string
- *                   from_email:
- *                     type: string
- *               security:
- *                 type: object
- *                 properties:
- *                   two_factor_auth:
- *                     type: boolean
- *                   auto_logout:
- *                     type: boolean
- *                   session_timeout_minutes:
- *                     type: integer
- *     responses:
- *       200:
- *         description: Cập nhật thành công
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden
- *       500:
- *         description: Server error
- */
-router.put("/admin/system_settings/update", requireAuth, requireRole("admin"), systemSettingsController.updateSystemSettings);
-
-/**
- * @swagger
  * /api/manager/product_inventory:
  *   get:
  *     summary: Manager Inventory Overview (System-wide storage)
@@ -3583,9 +3496,9 @@ router.post("/admin/createfranchise_stores", requireAuth, requireRole("admin"), 
  *     tags:
  *       - Admin
  *     security:
- *       - bearerAuth: [Admin Token]
+ *       - bearerAuth: []
  *     summary: Cập nhật thông tin cửa hàng franchise
- *     description: API này sẽ cập nhật thông tin của cửa hàng dựa trên store_id.
+ *     description: API này cập nhật thông tin cửa hàng theo store_id. Không hỗ trợ cập nhật số điện thoại và email.
  *     parameters:
  *       - in: path
  *         name: store_id
@@ -3613,18 +3526,10 @@ router.post("/admin/createfranchise_stores", requireAuth, requireRole("admin"), 
  *                 type: string
  *                 description: Địa chỉ cửa hàng
  *                 example: "123 Nguyễn Huệ, Quận 1, TP.HCM"
- *               store_phone:
- *                 type: string
- *                 description: Số điện thoại cửa hàng
- *                 example: "028-1234-5678"
- *               store_email:
- *                 type: string
- *                 description: Email của cửa hàng
- *                 example: "store1@franchise.com"
- *               manager_name:
- *                 type: string
- *                 description: Tên người quản lý cửa hàng
- *                 example: "Nguyễn Văn A"
+ *             required:
+ *               - store_code
+ *               - store_name
+ *               - store_address
  *     responses:
  *       200:
  *         description: Thành công, trả về thông tin cửa hàng đã cập nhật
@@ -3636,14 +3541,11 @@ router.post("/admin/createfranchise_stores", requireAuth, requireRole("admin"), 
  *                 franchise_store_id: 1
  *                 store_code: "FS-001"
  *                 name: "Chi Nhánh Quận 1"
- *                 status: "active"
  *                 address: "123 Nguyễn Huệ, Quận 1, TP.HCM"
- *                 phone: "028-1234-5678"
- *                 email: "store1@franchise.com"
- *                 manager_name: "Nguyễn Văn A"
+ *                 status: "active"
  *               message: "Cập nhật cửa hàng thành công"
  *       400:
- *         description: Thông tin gửi lên không hợp lệ
+ *         description: Thông tin gửi lên không hợp lệ hoặc mã cửa hàng đã tồn tại
  *       401:
  *         description: Unauthorized
  *       403:
@@ -3761,17 +3663,13 @@ router.get("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCe
  *     security:
  *       - bearerAuth: []
  *     summary: Tạo mới bếp trung tâm
- *     description: API này tạo một bếp trung tâm mới.
+ *     description: API này tạo mới một bếp trung tâm với mã bếp, tên, địa chỉ, công suất sản xuất và số lượng nhân sự.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - kitchen_code
- *               - kitchen_name
- *               - kitchen_address
  *             properties:
  *               kitchen_code:
  *                 type: string
@@ -3785,61 +3683,45 @@ router.get("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCe
  *                 type: string
  *                 description: Địa chỉ bếp trung tâm
  *                 example: "100 Lý Thường Kiệt, Quận 10"
+ *               production_capacity:
+ *                 type: integer
+ *                 description: Công suất sản xuất
+ *                 example: 500
+ *               staff_count:
+ *                 type: integer
+ *                 description: Số lượng nhân sự
+ *                 example: 12
+ *             required:
+ *               - kitchen_code
+ *               - kitchen_name
+ *               - kitchen_address
+ *               - production_capacity
+ *               - staff_count
  *     responses:
  *       200:
  *         description: Tạo bếp trung tâm thành công
  *         content:
  *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     central_kitchen_id:
- *                       type: integer
- *                       example: 1
- *                     kitchen_code:
- *                       type: string
- *                       example: "CK-001"
- *                     kitchen_name:
- *                       type: string
- *                       example: "Central Kitchen - Thu Duc"
- *                     kitchen_address:
- *                       type: string
- *                       example: "100 Lý Thường Kiệt, Quận 10"
- *                     kitchen_status:
- *                       type: string
- *                       example: "active"
- *                     created_at:
- *                       type: string
- *                       format: date-time
- *                       example: "2026-03-22T16:15:00.000Z"
- *                 message:
- *                   type: string
- *                   example: "Tạo bếp trung tâm thành công"
+ *             example:
+ *               success: true
+ *               data:
+ *                 central_kitchen_id: 1
+ *                 kitchen_code: "CK-001"
+ *                 kitchen_name: "Central Kitchen - Thu Duc"
+ *                 kitchen_address: "100 Lý Thường Kiệt, Quận 10"
+ *                 kitchen_status: "active"
+ *                 production_capacity: 500
+ *                 staff_count: 12
+ *                 created_at: "2026-03-24T09:30:00.000Z"
+ *               message: "Tạo bếp trung tâm thành công"
  *       400:
- *         description: Validation error hoặc mã bếp trung tâm đã tồn tại
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Mã bếp trung tâm đã tồn tại"
+ *         description: Thiếu thông tin bắt buộc hoặc mã bếp trung tâm đã tồn tại
  *       401:
  *         description: Unauthorized
  *       403:
  *         description: Forbidden - yêu cầu role admin
  *       500:
- *         description: Server/DB error
+ *         description: Lỗi server
  */
 router.post("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCentralKitchenManager.createCentralKitchen);
 
@@ -3852,7 +3734,7 @@ router.post("/admin/central_kitchens", requireAuth, requireRole("admin"), adminC
  *     security:
  *       - bearerAuth: []
  *     summary: Cập nhật thông tin bếp trung tâm
- *     description: API này sẽ cập nhật thông tin bếp trung tâm theo kitchen_id.
+ *     description: API này cập nhật thông tin bếp trung tâm theo kitchen_id. Không hỗ trợ cập nhật số điện thoại và email.
  *     parameters:
  *       - in: path
  *         name: kitchen_id
@@ -3880,14 +3762,6 @@ router.post("/admin/central_kitchens", requireAuth, requireRole("admin"), adminC
  *                 type: string
  *                 description: Địa chỉ bếp trung tâm
  *                 example: "100 Lý Thường Kiệt, Quận 10"
- *               kitchen_phone:
- *                 type: string
- *                 description: Số điện thoại bếp trung tâm
- *                 example: "028-5555-1234"
- *               kitchen_email:
- *                 type: string
- *                 description: Email bếp trung tâm
- *                 example: "kitchen@franchise.com"
  *               production_capacity:
  *                 type: integer
  *                 description: Công suất sản xuất (số đơn vị/ngày)
@@ -3896,6 +3770,12 @@ router.post("/admin/central_kitchens", requireAuth, requireRole("admin"), adminC
  *                 type: integer
  *                 description: Số lượng nhân sự
  *                 example: 12
+ *             required:
+ *               - kitchen_code
+ *               - kitchen_name
+ *               - kitchen_address
+ *               - production_capacity
+ *               - staff_count
  *     responses:
  *       200:
  *         description: Cập nhật thành công
@@ -3909,13 +3789,11 @@ router.post("/admin/central_kitchens", requireAuth, requireRole("admin"), adminC
  *                 kitchen_name: "Central Kitchen - Thu Duc"
  *                 kitchen_status: "active"
  *                 kitchen_address: "100 Lý Thường Kiệt, Quận 10"
- *                 kitchen_phone: "028-5555-1234"
- *                 kitchen_email: "kitchen@franchise.com"
  *                 production_capacity: 500
  *                 staff_count: 12
  *               message: "Cập nhật bếp trung tâm thành công"
  *       400:
- *         description: Thông tin gửi lên không hợp lệ
+ *         description: Thông tin gửi lên không hợp lệ hoặc mã bếp trung tâm đã tồn tại
  *       401:
  *         description: Unauthorized
  *       403:
