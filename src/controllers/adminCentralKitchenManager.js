@@ -148,13 +148,25 @@ async function updateStatus(req, res) {
 }
 
 async function createCentralKitchen(req, res) {
-    const { kitchen_code, kitchen_name, kitchen_address } = req.body;
+    const {
+        kitchen_code,
+        kitchen_name,
+        kitchen_address,
+        production_capacity,
+        staff_count
+    } = req.body;
 
     try {
-        if (!kitchen_code || !kitchen_name || !kitchen_address) {
+        if (
+            !kitchen_code ||
+            !kitchen_name ||
+            !kitchen_address ||
+            production_capacity == null ||
+            staff_count == null
+        ) {
             return res.status(400).json({
                 success: false,
-                message: 'kitchen_code, kitchen_name và kitchen_address là bắt buộc'
+                message: 'kitchen_code, kitchen_name, kitchen_address, production_capacity và staff_count là bắt buộc'
             });
         }
 
@@ -172,17 +184,26 @@ async function createCentralKitchen(req, res) {
 
         const result = await pool.query(
             `
-            INSERT INTO central_kitchen (kitchen_code, name, address, status)
-            VALUES ($1, $2, $3, 'active')
+            INSERT INTO central_kitchen (
+                kitchen_code,
+                name,
+                address,
+                production_capacity,
+                staff_count,
+                status
+            )
+            VALUES ($1, $2, $3, $4, $5, 'active')
             RETURNING
                 central_kitchen_id,
                 kitchen_code,
                 name AS kitchen_name,
                 address AS kitchen_address,
                 status AS kitchen_status,
+                production_capacity,
+                staff_count,
                 created_at;
             `,
-            [kitchen_code, kitchen_name, kitchen_address]
+            [kitchen_code, kitchen_name, kitchen_address, production_capacity, staff_count]
         );
 
         return res.json({
