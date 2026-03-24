@@ -179,4 +179,34 @@ async function login(req, res) {
     }
 }
 
-module.exports = { login };
+// Get current user info
+async function me(req, res) {
+    try {
+        // User info đã được attach bởi middleware requireAuth
+        const user = req.user;
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                data: null,
+                message: "Unauthorized",
+                error_code: "UNAUTHORIZED",
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: user,
+            message: null,
+        });
+    } catch (e) {
+        console.error("ME ERROR:", e);
+        return res.status(500).json({
+            success: false,
+            data: null,
+            message: "Server error",
+            error_code: "SERVER_ERROR",
+        });
+    }
+}
+
+module.exports = { login, me };
