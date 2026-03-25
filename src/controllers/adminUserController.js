@@ -129,7 +129,7 @@ async function updateUser(req, res) {
         const userId = Number(req.params.userId);
         const { username, email } = req.body || {};
 
-        if (!userId) {
+        if (!userId || Number.isNaN(userId) || userId <= 0) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -143,6 +143,36 @@ async function updateUser(req, res) {
                 success: false,
                 data: null,
                 message: "username và email là bắt buộc",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        if (typeof username !== "string" || !username.trim()) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "username không hợp lệ",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        if (typeof email !== "string" || !email.trim()) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "email không hợp lệ",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        const trimmedUsername = username.trim();
+        const trimmedEmail = email.trim();
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "Email không đúng định dạng",
                 error_code: "VALIDATION_ERROR",
             });
         }
@@ -163,7 +193,7 @@ async function updateUser(req, res) {
 
         const duplicate = await pool.query(
             `SELECT user_id FROM "user" WHERE email = $1 AND user_id <> $2`,
-            [email, userId]
+            [trimmedEmail, userId]
         );
 
         if (duplicate.rowCount > 0) {
@@ -183,7 +213,7 @@ async function updateUser(req, res) {
             WHERE user_id = $3
             RETURNING user_id, username, email, status, created_at, last_login_at
             `,
-            [username.trim(), email.trim(), userId]
+            [trimmedUsername, trimmedEmail, userId]
         );
 
         return res.json({
@@ -207,7 +237,7 @@ async function resetPassword(req, res) {
         const userId = Number(req.params.userId);
         const { new_password } = req.body || {};
 
-        if (!userId) {
+        if (!userId || Number.isNaN(userId) || userId <= 0) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -216,7 +246,16 @@ async function resetPassword(req, res) {
             });
         }
 
-        if (!new_password || String(new_password).length < 6) {
+        if (new_password == null || String(new_password).trim() === "") {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "new_password là bắt buộc",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        if (String(new_password).trim().length < 6) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -239,7 +278,7 @@ async function resetPassword(req, res) {
             });
         }
 
-        const passwordHash = await bcrypt.hash(String(new_password), 10);
+        const passwordHash = await bcrypt.hash(String(new_password).trim(), 10);
 
         await pool.query(
             `UPDATE "user" SET password = $1 WHERE user_id = $2`,
@@ -267,7 +306,7 @@ async function updateUserStatus(req, res) {
         const userId = Number(req.params.userId);
         const { status } = req.body || {};
 
-        if (!userId) {
+        if (!userId || Number.isNaN(userId) || userId <= 0) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -276,7 +315,18 @@ async function updateUserStatus(req, res) {
             });
         }
 
-        if (!["active", "inactive"].includes(status)) {
+        if (!status || typeof status !== "string" || !status.trim()) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "status là bắt buộc",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        const trimmedStatus = status.trim().toLowerCase();
+
+        if (!["active", "inactive"].includes(trimmedStatus)) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -286,7 +336,7 @@ async function updateUserStatus(req, res) {
         }
 
         // không cho admin tự vô hiệu hóa chính mình
-        if (Number(req.user?.user_id) === userId && status === "inactive") {
+        if (Number(req.user?.user_id) === userId && trimmedStatus === "inactive") {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -316,13 +366,13 @@ async function updateUserStatus(req, res) {
             WHERE user_id = $2
             RETURNING user_id, username, email, status
             `,
-            [status, userId]
+            [trimmedStatus, userId]
         );
 
         return res.json({
             success: true,
             data: rs.rows[0],
-            message: status === "active"
+            message: trimmedStatus === "active"
                 ? "Kích hoạt tài khoản thành công"
                 : "Vô hiệu hóa tài khoản thành công",
         });
@@ -359,7 +409,38 @@ async function createUser(req, res) {
             });
         }
 
-        if (String(password).length < 6) {
+        if (typeof username !== "string" || !username.trim()) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "username không hợp lệ",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        if (typeof email !== "string" || !email.trim()) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "email không hợp lệ",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        const trimmedUsername = username.trim();
+        const trimmedEmail = email.trim();
+        const normalizedRole = String(role || "").trim();
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: "Email không đúng định dạng",
+                error_code: "VALIDATION_ERROR",
+            });
+        }
+
+        if (String(password).trim().length < 6) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -368,7 +449,7 @@ async function createUser(req, res) {
             });
         }
 
-        if (!["user", "manager", "admin", "franchise_staff", "kitchen_staff"].includes(role)) {
+        if (!["user", "manager", "admin", "franchise_staff", "kitchen_staff"].includes(normalizedRole)) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -377,9 +458,31 @@ async function createUser(req, res) {
             });
         }
 
+        if (normalizedRole === "franchise_staff") {
+            if (!franchise_store_id || isNaN(franchise_store_id) || Number(franchise_store_id) <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    data: null,
+                    message: "franchise_store_id là bắt buộc và phải là số dương khi role là franchise_staff",
+                    error_code: "VALIDATION_ERROR",
+                });
+            }
+        }
+
+        if (normalizedRole === "kitchen_staff") {
+            if (!central_kitchen_id || isNaN(central_kitchen_id) || Number(central_kitchen_id) <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    data: null,
+                    message: "central_kitchen_id là bắt buộc và phải là số dương khi role là kitchen_staff",
+                    error_code: "VALIDATION_ERROR",
+                });
+            }
+        }
+
         const duplicate = await client.query(
             `SELECT user_id FROM "user" WHERE email = $1`,
-            [email.trim()]
+            [trimmedEmail]
         );
 
         if (duplicate.rowCount > 0) {
@@ -393,7 +496,7 @@ async function createUser(req, res) {
 
         await client.query("BEGIN");
 
-        const passwordHash = await bcrypt.hash(String(password), 10);
+        const passwordHash = await bcrypt.hash(String(password).trim(), 10);
 
         const rs = await client.query(
             `
@@ -401,13 +504,13 @@ async function createUser(req, res) {
             VALUES ($1, $2, $3, 'active')
             RETURNING user_id, username, email, status, created_at, last_login_at
             `,
-            [username.trim(), email.trim(), passwordHash]
+            [trimmedUsername, trimmedEmail, passwordHash]
         );
 
         const newUser = rs.rows[0];
 
-        if (role === "admin" || role === "manager") {
-            const isAdmin = role === "admin";
+        if (normalizedRole === "admin" || normalizedRole === "manager") {
+            const isAdmin = normalizedRole === "admin";
             const managerCode = `MG-${newUser.user_id}`;
 
             await client.query(
@@ -417,7 +520,7 @@ async function createUser(req, res) {
                 `,
                 [newUser.user_id, managerCode, isAdmin]
             );
-        } else if (role === "franchise_staff") {
+        } else if (normalizedRole === "franchise_staff") {
             if (!franchise_store_id) {
                 await client.query("ROLLBACK");
                 return res.status(400).json({
@@ -459,9 +562,9 @@ async function createUser(req, res) {
                 SET email = $1
                 WHERE franchise_store_id = $2
                 `,
-                [email.trim(), franchise_store_id]
+                [trimmedEmail, franchise_store_id]
             );
-        } else if (role === "kitchen_staff") {
+        } else if (normalizedRole === "kitchen_staff") {
             if (!central_kitchen_id) {
                 await client.query("ROLLBACK");
                 return res.status(400).json({
@@ -503,7 +606,7 @@ async function createUser(req, res) {
                 SET email = $1
                 WHERE central_kitchen_id = $2
                 `,
-                [email.trim(), central_kitchen_id]
+                [trimmedEmail, central_kitchen_id]
             );
         }
 
