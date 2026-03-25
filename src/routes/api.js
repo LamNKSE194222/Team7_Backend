@@ -2362,14 +2362,351 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
  */
 router.get("/admin/system_report", requireAuth, requireRole("admin"), systemReport);
 
+/**
+ * @swagger
+ * /api/manager/materials/{id}:
+ *   get:
+ *     summary: Lấy chi tiết nguyên liệu
+ *     description: Trả về thông tin chi tiết của một nguyên liệu theo ID.
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID của nguyên liệu
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Lấy thông tin nguyên liệu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 inventory_item_id: "1"
+ *                 material_id: "1"
+ *                 name: "Bột mì đa dụng"
+ *                 material_code: "BTT001"
+ *                 uom: "kg"
+ *                 material_type: "Bột"
+ *                 cost_price: null
+ *                 min_stock: 0
+ *                 on_hand_qty: "413"
+ *                 expiry_date: "2026-12-30T17:00:00.000Z"
+ *                 is_active: true
+ *       400:
+ *         description: ID không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Không tìm thấy nguyên liệu
+ *       500:
+ *         description: Server error
+ */
 router.get("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), getMaterialById);
+
+/**
+ * @swagger
+ * /api/manager/material-types:
+ *   get:
+ *     summary: Lấy danh sách loại nguyên liệu
+ *     description: Trả về danh sách tất cả loại nguyên liệu trong hệ thống.
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách loại nguyên liệu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - materials_type_id: "1"
+ *                   name: "Bột"
+ *                 - materials_type_id: "2"
+ *                   name: "Nhân bánh"
+ *                 - materials_type_id: "3"
+ *                   name: "Phụ gia"
+ *                 - materials_type_id: "4"
+ *                   name: "Trứng & Sữa"
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
 router.get("/manager/material-types", requireAuth, requireRole("manager", "admin"), getMaterialTypes);
+
+/**
+ * @swagger
+ * /api/manager/materials:
+ *   post:
+ *     summary: Tạo mới nguyên liệu
+ *     description: Tạo một nguyên liệu mới và thêm vào kho trung tâm.
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             name: "Đường tinh luyện"
+ *             material_code: "DUONG004"
+ *             uom: "kg"
+ *             materials_type_id: 1
+ *             cost_price: 28400
+ *             min_stock: 20
+ *             on_hand_qty: 120
+ *             expiry_date: "2027-01-01"
+ *             central_kitchen_id: 2
+ *     responses:
+ *       200:
+ *         description: Tạo nguyên liệu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 material_id: "59"
+ *                 materials_type_id: "1"
+ *                 material_code: "DUONG004"
+ *                 name: "Đường tinh luyện"
+ *                 uom: "kg"
+ *                 is_active: true
+ *                 cost_price: 28400
+ *                 min_stock: 20
+ *                 created_at: "2026-03-25T15:20:25.568Z"
+ *       400:
+ *         description: Dữ liệu đầu vào không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
 router.post("/manager/materials", requireAuth, requireRole("manager", "admin"), createMaterial);
+
+/**
+ * @swagger
+ * /api/manager/materials/{id}:
+ *   put:
+ *     summary: Cập nhật nguyên liệu
+ *     description: Cập nhật thông tin chi tiết của một nguyên liệu.
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID của nguyên liệu cần cập nhật
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             name: "Bột mì đa dụng"
+ *             uom: "kg"
+ *             materials_type_id: 1
+ *             cost_price: 25000
+ *             min_stock: 10
+ *             on_hand_qty: 150
+ *             expiry_date: "2026-12-31"
+ *             is_active: true
+ *     responses:
+ *       200:
+ *         description: Cập nhật nguyên liệu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 material_id: "1"
+ *                 materials_type_id: "1"
+ *                 material_code: "BTT001"
+ *                 name: "Bột mì đa dụng"
+ *                 uom: "kg"
+ *                 is_active: true
+ *                 cost_price: 25000
+ *                 min_stock: 10
+ *                 updated_at: "2026-03-25T15:25:00.000Z"
+ *       400:
+ *         description: Dữ liệu đầu vào không hợp lệ
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Không tìm thấy nguyên liệu
+ *       500:
+ *         description: Server error
+ */
 router.put("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), updateMaterial);
+
+/**
+ * @swagger
+ * /api/manager/materials/{id}:
+ *   delete:
+ *     summary: Xóa nguyên liệu
+ *     description: Xóa một nguyên liệu khỏi hệ thống (chỉ xóa nếu không có trong bất kỳ công thức nào).
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: ID của nguyên liệu cần xóa
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *     responses:
+ *       200:
+ *         description: Xóa nguyên liệu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 message: "Xóa nguyên liệu thành công"
+ *       400:
+ *         description: Không thể xóa nguyên liệu (đang được sử dụng trong công thức)
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Không tìm thấy nguyên liệu
+ *       500:
+ *         description: Server error
+ */
 router.delete("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), deleteMaterial);
 
+/**
+ * @swagger
+ * /api/manager/central-kitchens:
+ *   get:
+ *     summary: Lấy danh sách bếp trung tâm
+ *     description: Trả về danh sách tất cả các bếp trung tâm trong hệ thống.
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách bếp trung tâm thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - central_kitchen_id: 1
+ *                   name: "Bếp trung tâm Quận 1"
+ *                   address: "123 Nguyễn Huệ, Quận 1, TP.HCM"
+ *                   phone: "02812345678"
+ *                   is_active: true
+ *                 - central_kitchen_id: 2
+ *                   name: "Bếp trung tâm Quận 3"
+ *                   address: "456 Lê Văn Sỹ, Quận 3, TP.HCM"
+ *                   phone: "02812345679"
+ *                   is_active: true
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
 router.get("/manager/central-kitchens", requireAuth, requireRole("manager", "admin"), getCentralKitchens);
+
+/**
+ * @swagger
+ * /api/Manager_get_product_types:
+ *   get:
+ *     summary: Lấy danh sách loại sản phẩm
+ *     description: Trả về danh sách tất cả các loại sản phẩm trong hệ thống.
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách loại sản phẩm thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - product_type_id: 1
+ *                   name: "Bánh mì"
+ *                   is_active: true
+ *                 - product_type_id: 2
+ *                   name: "Bánh ngọt"
+ *                   is_active: true
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
 router.get("/Manager_get_product_types", requireAuth, requireRole("manager", "admin"), ManagerProductController.getProductTypes);
+
+/**
+ * @swagger
+ * /api/Manager_get_materials:
+ *   get:
+ *     summary: Lấy danh sách tất cả nguyên liệu
+ *     description: Trả về danh sách tất cả các nguyên liệu trong hệ thống.
+ *     tags: [Manager]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách nguyên liệu thành công
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: true
+ *               data:
+ *                 - material_id: 1
+ *                   name: "Bột mì đa dụng"
+ *                   material_code: "BTT001"
+ *                   uom: "kg"
+ *                   material_type: "Bột"
+ *                   cost_price: 25000
+ *                   min_stock: 10
+ *                   on_hand_qty: 150
+ *                   expiry_date: "2026-12-31"
+ *                   is_active: true
+ *                 - material_id: 2
+ *                   name: "Đường tinh luyện"
+ *                   material_code: "DUONG001"
+ *                   uom: "kg"
+ *                   material_type: "Đường"
+ *                   cost_price: 28000
+ *                   min_stock: 20
+ *                   on_hand_qty: 200
+ *                   expiry_date: "2026-11-30"
+ *                   is_active: true
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Server error
+ */
 router.get("/Manager_get_materials", requireAuth, requireRole("manager", "admin"), getAllMaterials);
 
 /**
