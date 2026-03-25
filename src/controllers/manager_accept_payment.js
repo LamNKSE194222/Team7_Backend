@@ -2,9 +2,8 @@ const pool = require("../config/database");
 
 async function confirmPaymentOrder(req, res) {
     try {
-        const { orderId } = req.params;
-
-        if (!orderId || isNaN(orderId)) {
+        const orderId = Number(req.params.order_id);
+        if (!Number.isFinite(orderId)) {
             return res.status(400).json({
                 success: false,
                 message: "orderId không hợp lệ"
@@ -34,7 +33,7 @@ async function confirmPaymentOrder(req, res) {
         if (rs.rows.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "Chỉ có thể xác nhận thanh toán cho đơn thuộc cửa hàng của bạn, đang ở trạng thái approved và chưa thanh toán"
+                message: "Chỉ có thể xác nhận thanh toán cho đơn đang ở trạng thái đã nhận hàng (confirmed) và chưa thanh toán"
             });
         }
 

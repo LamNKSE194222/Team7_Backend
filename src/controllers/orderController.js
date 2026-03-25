@@ -395,11 +395,22 @@ async function cancelOrder(req, res) {
 
 async function getPaymentOrders(req, res) {
     try {
-        if (!req.user?.franchise_store_id) {
+        const role = req.user?.role;
+        const franchiseStoreId = req.user?.franchise_store_id;
+
+        // Cho phép manager/admin hoặc franchise staff có store_id
+        if (role !== "manager" && role !== "admin" && !franchiseStoreId) {
             return res.status(403).json({
                 success: false,
                 message: "Không có quyền xem đơn thanh toán"
             });
+        }
+
+        // Nếu là manager/admin thì có thể xem theo store_id truyền lên hoặc xem tất cả (null)
+        // Nếu là franchise_staff thì bắt buộc phải xem store của mình
+        let targetStoreId = franchiseStoreId;
+        if ((role === "manager" || role === "admin") && req.query.store_id) {
+            targetStoreId = Number(req.query.store_id);
         }
 
         const rs = await pool.query(
@@ -443,7 +454,7 @@ async function getPaymentOrders(req, res) {
                 ON oi.order_id = o.order_id
             LEFT JOIN product p
                 ON p.product_id = oi.product_id
-            WHERE o.franchise_store_id = $1
+            WHERE ($1::int IS NULL OR o.franchise_store_id = $1)
               AND COALESCE(o.payment_status, 'unpaid') IN ('unpaid', 'paid')
               AND o.received_confirmed_at IS NOT NULL
             GROUP BY
@@ -455,7 +466,7 @@ async function getPaymentOrders(req, res) {
                 o.received_confirmed_at
             ORDER BY o.created_at DESC
             `,
-            [req.user.franchise_store_id]
+            [targetStoreId]
         );
 
         const waitingPaymentOrders = rs.rows
