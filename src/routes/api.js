@@ -2334,13 +2334,6 @@ router.get("/manager/dashboard", requireAuth, requireRole("manager", "admin"), M
  *                   unpaid_amount: 39600000
  *                   total_order_value: 126350000
  *                   collection_rate: 10
- *                 order_status:
- *                   pending: 1
- *                   approved: 1
- *                   processing: 8
- *                   fulfilled: 5
- *                   confirmed: 0
- *                   cancelled: 1
  *                 store_report:
  *                   - franchise_store_id: 1
  *                     store_name: "Chi nhanh Quan 1"
