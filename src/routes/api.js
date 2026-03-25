@@ -4113,10 +4113,6 @@ router.post("/admin/central_kitchens", requireAuth, requireRole("admin"), adminC
  *                 type: integer
  *                 description: Công suất sản xuất (số đơn vị/ngày)
  *                 example: 500
- *               staff_count:
- *                 type: integer
- *                 description: Số lượng nhân sự
- *                 example: 12
  *             required:
  *               - kitchen_code
  *               - kitchen_name
