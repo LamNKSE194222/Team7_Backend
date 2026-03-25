@@ -25,7 +25,7 @@ const manager_accept_payment = require("../controllers/manager_accept_payment.js
 const admin_dashboard = require("../controllers/admin_dashboard.js")
 const adminStoreManager = require('../controllers/adminStoreManager');
 const adminCentralKitchenManager = require('../controllers/adminCentralKitchenManager');
-const { getMaterialById, createMaterial, updateMaterial, deleteMaterial, getMaterialTypes, getCentralKitchens } = require("../controllers/manager_materialController");
+const { getMaterialById, createMaterial, updateMaterial, deleteMaterial, getMaterialTypes, getCentralKitchens, getAllMaterials } = require("../controllers/manager_materialController");
 
 /**
  * @swagger
@@ -2369,6 +2369,8 @@ router.put("/manager/materials/:id", requireAuth, requireRole("manager", "admin"
 router.delete("/manager/materials/:id", requireAuth, requireRole("manager", "admin"), deleteMaterial);
 
 router.get("/manager/central-kitchens", requireAuth, requireRole("manager", "admin"), getCentralKitchens);
+router.get("/Manager_get_product_types", requireAuth, requireRole("manager", "admin"), ManagerProductController.getProductTypes);
+router.get("/Manager_get_materials", requireAuth, requireRole("manager", "admin"), getAllMaterials);
 
 /**
  * @swagger

@@ -231,11 +231,27 @@ async function getCentralKitchens(req, res) {
     }
 }
 
+async function getAllMaterials(req, res) {
+    try {
+        const rs = await pool.query(`
+            SELECT material_id, name AS material_name, material_code, uom
+            FROM material
+            WHERE is_active = true
+            ORDER BY name ASC
+        `);
+        return res.json({ success: true, data: rs.rows });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+}
+
 module.exports = {
     getMaterialById,
     createMaterial,
     updateMaterial,
     deleteMaterial,
     getMaterialTypes,
-    getCentralKitchens
+    getCentralKitchens,
+    getAllMaterials
 };

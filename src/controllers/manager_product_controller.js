@@ -427,4 +427,22 @@ async function restoreProduct(req, res) {
     }
 }
 
-module.exports = { createProduct, getProducts, getProductById, updateProduct, deleteProduct, restoreProduct };
+async function getProductTypes(req, res) {
+    try {
+        const result = await pool.query(
+            "SELECT product_type_id, name AS product_type_name FROM product_type ORDER BY name ASC"
+        );
+        return res.status(200).json({
+            success: true,
+            data: result.rows
+        });
+    } catch (error) {
+        console.error("GET PRODUCT TYPES ERROR:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Lỗi server khi lấy danh sách loại sản phẩm"
+        });
+    }
+}
+
+module.exports = { createProduct, getProducts, getProductById, updateProduct, deleteProduct, restoreProduct, getProductTypes };
