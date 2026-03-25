@@ -1046,7 +1046,7 @@ router.get("/franchiseStaff_dashboard", requireAuth, requireFranchiseStaff, Fdas
  *       200:
  *         description: Lấy dữ liệu thanh toán thành công
  */
-router.get("/franchise/payment-orders", requireAuth, requireFranchiseStaff, orderController.getPaymentOrders);
+router.get("/franchise/payment-orders", requireAuth, requireRole("franchise_staff", "manager", "admin"), orderController.getPaymentOrders);
 
 /**
  * @swagger
@@ -2824,7 +2824,7 @@ router.patch("/Manager_restore_products/:id", requireAuth, requireRole("manager"
  *                   type: string
  *                   example: Server error
  */
-router.patch("/Manager_comfirmPaymentOrder/orders/:orderId", requireAuth, requireRole("manager", "admin"), manager_accept_payment.confirmPaymentOrder);
+router.patch("/Manager_confirmPaymentOrder/orders/:order_id", requireAuth, requireRole("manager", "admin"), manager_accept_payment.confirmPaymentOrder);
 
 /**
  * @swagger
