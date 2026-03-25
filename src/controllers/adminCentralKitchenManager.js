@@ -10,8 +10,7 @@ async function getAllCentralKitchens(req, res) {
                 name AS kitchen_name,
                 status AS kitchen_status,
                 address AS kitchen_address,
-                production_capacity AS capacity,
-                staff_count AS staff_count
+                production_capacity AS capacity
             FROM central_kitchen
             ORDER BY kitchen_name ASC;
             `
@@ -44,8 +43,7 @@ async function getCentralKitchenById(req, res) {
                 name AS kitchen_name,
                 status AS kitchen_status,
                 address AS kitchen_address,
-                production_capacity AS production_capacity,
-                staff_count
+                production_capacity AS production_capacity
             FROM central_kitchen
             WHERE central_kitchen_id = $1
             `,
@@ -65,7 +63,7 @@ async function getCentralKitchenById(req, res) {
 
 async function updateCentralKitchen(req, res) {
     const kitchen_id = req.params.kitchen_id;
-    const { kitchen_code, kitchen_name, kitchen_address, production_capacity, staff_count } = req.body;
+    const { kitchen_code, kitchen_name, kitchen_address, production_capacity } = req.body;
 
     try {
         const current = await pool.query(
@@ -95,8 +93,7 @@ async function updateCentralKitchen(req, res) {
                 name = $2,
                 address = $3,
                 production_capacity = $4,
-                staff_count = $5
-            WHERE central_kitchen_id = $6
+            WHERE central_kitchen_id = $5
             RETURNING
                 central_kitchen_id,
                 kitchen_code,
@@ -104,7 +101,6 @@ async function updateCentralKitchen(req, res) {
                 status AS kitchen_status,
                 address AS kitchen_address,
                 production_capacity,
-                staff_count;
             `,
             [kitchen_code, kitchen_name, kitchen_address, production_capacity, staff_count, kitchen_id]
         );
@@ -189,10 +185,9 @@ async function createCentralKitchen(req, res) {
                 name,
                 address,
                 production_capacity,
-                staff_count,
                 status
             )
-            VALUES ($1, $2, $3, $4, $5, 'active')
+            VALUES ($1, $2, $3, $4, 'active')
             RETURNING
                 central_kitchen_id,
                 kitchen_code,
@@ -200,10 +195,9 @@ async function createCentralKitchen(req, res) {
                 address AS kitchen_address,
                 status AS kitchen_status,
                 production_capacity,
-                staff_count,
                 created_at;
             `,
-            [kitchen_code, kitchen_name, kitchen_address, production_capacity, staff_count]
+            [kitchen_code, kitchen_name, kitchen_address, production_capacity]
         );
 
         return res.json({

@@ -208,134 +208,6 @@ async function getNewOrderDetail(req, res) {
     }
 }
 
-async function deductInventoryForOrder(client, centralKitchenId, orderId) {
-    const orderItemsRs = await client.query(
-        `
-        SELECT
-            oi.product_id,
-            p.name AS product_name,
-            p.uom,
-            SUM(oi.qty)::numeric AS required_qty
-        FROM order_item oi
-        JOIN product p
-          ON p.product_id = oi.product_id
-        WHERE oi.order_id = $1
-        GROUP BY oi.product_id, p.name, p.uom
-        ORDER BY oi.product_id
-        `,
-        [orderId]
-    );
-
-    if (!orderItemsRs.rows.length) {
-        throw new ApiError(
-            400,
-            "Đơn hàng không có sản phẩm để trừ kho",
-            "ORDER_HAS_NO_ITEMS"
-        );
-    }
-
-    const productIds = orderItemsRs.rows.map(r => Number(r.product_id));
-
-    const inventoryRs = await client.query(
-        `
-        SELECT
-            inventory_item_id,
-            product_id,
-            on_hand_qty,
-            min_qty,
-            expiry_date
-        FROM central_kitchen_product_inventory_item
-        WHERE central_kitchen_id = $1
-          AND product_id = ANY($2::int[])
-          AND on_hand_qty > 0
-        ORDER BY product_id ASC, expiry_date ASC NULLS LAST, inventory_item_id ASC
-        FOR UPDATE
-        `,
-        [centralKitchenId, productIds]
-    );
-
-    const lotsByProduct = new Map();
-
-    for (const row of inventoryRs.rows) {
-        const productId = Number(row.product_id);
-        if (!lotsByProduct.has(productId)) lotsByProduct.set(productId, []);
-        lotsByProduct.get(productId).push({
-            inventory_item_id: Number(row.inventory_item_id),
-            on_hand_qty: Number(row.on_hand_qty),
-            min_qty: Number(row.min_qty || 0),
-            expiry_date: row.expiry_date,
-        });
-    }
-
-    // Kiểm tra đủ tồn kho trước khi trừ
-    const shortages = [];
-
-    for (const item of orderItemsRs.rows) {
-        const productId = Number(item.product_id);
-        const requiredQty = Number(item.required_qty);
-        const lots = lotsByProduct.get(productId) || [];
-        const availableQty = lots.reduce((sum, lot) => sum + Number(lot.on_hand_qty), 0);
-
-        if (availableQty < requiredQty) {
-            shortages.push({
-                product_id: productId,
-                product_name: item.product_name,
-                required_qty: requiredQty,
-                available_qty: availableQty,
-                missing_qty: requiredQty - availableQty,
-                uom: item.uom,
-            });
-        }
-    }
-
-    if (shortages.length) {
-        throw new ApiError(
-            409,
-            "Không đủ tồn kho để chấp nhận đơn",
-            "INSUFFICIENT_STOCK",
-            { shortages }
-        );
-    }
-
-    // Bắt đầu trừ kho
-    const deductedItems = [];
-
-    for (const item of orderItemsRs.rows) {
-        const productId = Number(item.product_id);
-        let remaining = Number(item.required_qty);
-        const lots = lotsByProduct.get(productId) || [];
-
-        for (const lot of lots) {
-            if (remaining <= 0) break;
-            if (lot.on_hand_qty <= 0) continue;
-
-            const deductQty = Math.min(lot.on_hand_qty, remaining);
-
-            await client.query(
-                `
-                UPDATE central_kitchen_product_inventory_item
-                SET on_hand_qty = on_hand_qty - $1,
-                    last_updated_at = NOW()
-                WHERE inventory_item_id = $2
-                `,
-                [deductQty, lot.inventory_item_id]
-            );
-
-            lot.on_hand_qty -= deductQty;
-            remaining -= deductQty;
-        }
-
-        deductedItems.push({
-            product_id: productId,
-            product_name: item.product_name,
-            deducted_qty: Number(item.required_qty),
-            uom: item.uom,
-        });
-    }
-
-    return deductedItems;
-}
-
 async function acceptNewOrder(req, res) {
     const client = await pool.connect();
 
@@ -350,7 +222,7 @@ async function acceptNewOrder(req, res) {
         // Lock order trước để tránh accept cùng lúc
         const orderRs = await client.query(
             `
-            SELECT order_id, order_code, status
+            SELECT order_id, order_code, status, franchise_store_id
             FROM orders
             WHERE order_id = $1
               AND central_kitchen_id = $2
@@ -367,7 +239,9 @@ async function acceptNewOrder(req, res) {
             );
         }
 
-        if (orderRs.rows[0].status !== "pending") {
+        const order = orderRs.rows[0];
+
+        if (order.status !== "pending") {
             throw new ApiError(
                 409,
                 "Đơn không còn ở trạng thái chờ xử lý",
@@ -386,22 +260,97 @@ async function acceptNewOrder(req, res) {
         const upRs = await client.query(
             `
             UPDATE orders
-            SET status = 'processing'
+            SET 
+                status = 'processing',
+                approved_at = NOW(),
+                processing_started_at = NOW()
             WHERE order_id = $1
-            RETURNING order_id, order_code, status
+            RETURNING order_id, order_code, status, franchise_store_id
             `,
             [orderId]
         );
 
+        const updatedOrder = upRs.rows[0];
+
+        // Tìm user thuộc franchise store để gửi notification
+        const staffRs = await client.query(
+            `
+            SELECT fs.user_id
+            FROM franchise_staff fs
+            JOIN "user" u ON u.user_id = fs.user_id
+            WHERE fs.franchise_store_id = $1
+              AND fs.status = 'active'
+              AND u.status = 'active'
+            `,
+            [order.franchise_store_id]
+        );
+
+        const title = "Đơn hàng đã được chấp nhận";
+        const message = `Đơn hàng ${updatedOrder.order_code} đã được bếp trung tâm chấp nhận và đang được xử lý`;
+
+        const notifications = [];
+
+        for (const staff of staffRs.rows) {
+            const notiRs = await client.query(
+                `
+                INSERT INTO notification (
+                    user_id,
+                    type,
+                    title,
+                    message,
+                    status,
+                    channel,
+                    priority,
+                    created_at,
+                    read_at,
+                    order_id
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NULL, $8)
+                RETURNING *
+                `,
+                [
+                    staff.user_id,
+                    "ORDER_ACCEPTED",
+                    title,
+                    message,
+                    "unread",
+                    "in_app",
+                    "normal",
+                    orderId
+                ]
+            );
+
+            notifications.push(notiRs.rows[0]);
+        }
+
         await client.query("COMMIT");
+
+        // REALTIME
+        const io = req.app.get("io");
+
+        for (const notification of notifications) {
+            io.to(`user_${notification.user_id}`).emit("notification:new", {
+                notification_id: notification.notification_id,
+                user_id: notification.user_id,
+                type: notification.type,
+                title: notification.title,
+                message: notification.message,
+                status: notification.status,
+                channel: notification.channel,
+                priority: notification.priority,
+                created_at: notification.created_at,
+                read_at: notification.read_at,
+                order_id: notification.order_id
+            });
+        }
 
         return res.json({
             success: true,
             data: {
-                ...upRs.rows[0],
+                ...updatedOrder,
                 deducted_items: deductedItems,
             },
-            message: "Đã chấp nhận đơn ",
+            message: "Đã chấp nhận đơn và gửi thông báo cho franchise store",
         });
     } catch (e) {
         await client.query("ROLLBACK");
@@ -426,98 +375,4 @@ async function acceptNewOrder(req, res) {
     }
 }
 
-async function rejectNewOrder(req, res) {
-    const client = await pool.connect();
-
-    try {
-        const orderId = parseOrderId(req, res);
-        if (orderId === null) return;
-
-        const centralKitchenId = req.user.central_kitchen_id;
-        const { reason } = req.body || {};
-
-        if (!reason || String(reason).trim().length < 3) {
-            return res.status(400).json({
-                success: false,
-                data: null,
-                message: "reason là bắt buộc (>= 3 ký tự)",
-                error_code: "VALIDATION_ERROR",
-            });
-        }
-
-        console.warn(
-            `[NEW_ORDER_REJECT] kitchen_user=${req.user.user_id} ck=${centralKitchenId} orderId=${orderId} reason="${String(
-                reason
-            ).trim()}"`
-        );
-
-        await client.query("BEGIN");
-
-        const orderRs = await client.query(
-            `
-            SELECT order_id, order_code, status
-            FROM orders
-            WHERE order_id = $1
-              AND central_kitchen_id = $2
-            FOR UPDATE
-            `,
-            [orderId, centralKitchenId]
-        );
-
-        if (!orderRs.rows.length) {
-            throw new ApiError(
-                404,
-                "Không tìm thấy đơn hàng hoặc đơn không thuộc bếp trung tâm của bạn",
-                "NOT_FOUND"
-            );
-        }
-
-        if (orderRs.rows[0].status !== "pending") {
-            throw new ApiError(
-                409,
-                "Đơn không còn ở trạng thái chờ xử lý",
-                "ORDER_STATUS_CONFLICT"
-            );
-        }
-
-        const upRs = await client.query(
-            `
-            UPDATE orders
-            SET status = 'cancelled'
-            WHERE order_id = $1
-            RETURNING order_id, order_code, status
-            `,
-            [orderId]
-        );
-
-        await client.query("COMMIT");
-
-        return res.json({
-            success: true,
-            data: upRs.rows[0],
-            message: "Đã từ chối đơn",
-        });
-    } catch (e) {
-        await client.query("ROLLBACK");
-        console.error("CK rejectNewOrder error:", e);
-
-        if (e instanceof ApiError) {
-            return res.status(e.status).json({
-                success: false,
-                data: e.data,
-                message: e.message,
-                error_code: e.errorCode,
-            });
-        }
-
-        return res.status(500).json({
-            success: false,
-            data: null,
-            message: "Server/DB error",
-        });
-    } finally {
-        client.release();
-    }
-}
-
-module.exports = { listNewOrders, getNewOrderDetail, acceptNewOrder, rejectNewOrder, };
+module.exports = { listNewOrders, getNewOrderDetail, acceptNewOrder };
