@@ -3701,10 +3701,6 @@ router.get("/admin/central_kitchens", requireAuth, requireRole("admin"), adminCe
  *                 type: integer
  *                 description: Công suất sản xuất
  *                 example: 500
- *               staff_count:
- *                 type: integer
- *                 description: Số lượng nhân sự
- *                 example: 12
  *             required:
  *               - kitchen_code
  *               - kitchen_name
