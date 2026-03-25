@@ -3646,7 +3646,6 @@ router.patch("/admin/franchise_stores/:store_id/status", requireAuth, requireRol
  *                   kitchen_status: "active"
  *                   kitchen_address: "100 Lý Thường Kiệt, Quận 10"              
  *                   kitchen_email: "kitchen@franchise.com"
- *                   staff_count: 12
  *                   capacity: 500
  *               message: null
  *       401:

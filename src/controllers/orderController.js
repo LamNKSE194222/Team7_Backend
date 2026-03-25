@@ -297,6 +297,7 @@ async function getOrders(req, res) {
         });
     }
 }
+
 async function cancelOrder(req, res) {
     const client = await pool.connect();
 
