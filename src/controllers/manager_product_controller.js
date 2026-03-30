@@ -363,11 +363,13 @@ async function deleteProduct(req, res) {
 
         const result = await pool.query(
             `
-      UPDATE product
-      SET is_active = FALSE
-      WHERE product_id = $1
-      RETURNING *
-      `,
+            UPDATE product p
+            SET is_active = FALSE
+            FROM central_kitchen_product_inventory_item ckpii
+            WHERE ckpii.product_id = p.product_id
+              AND ckpii.inventory_item_id = $1
+            RETURNING p.*;
+            `,
             [id]
         );
 
