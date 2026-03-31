@@ -36,14 +36,12 @@ SELECT
 FROM central_kitchen_inventory_item ckii
 JOIN material m ON m.material_id = ckii.material_id
 JOIN materials_type mt ON mt.materials_type_id = m.materials_type_id
-WHERE ckii.on_hand_qty <= $1
+WHERE ckii.on_hand_qty < m.min_stock
   AND m.is_active = true
   AND mt.is_active = true
 ORDER BY ckii.on_hand_qty ASC
 LIMIT 10
-`,
-            [threshold]
-        );
+`);
 
         const lowStockCount = lowStockRs.rows.length;
 
@@ -99,7 +97,6 @@ LIMIT 10
                 cards,
                 materials_inventory: materialsInventoryRs.rows,
                 low_stock_alerts: lowStockRs.rows,
-                threshold,
             },
             message: null,
         });
