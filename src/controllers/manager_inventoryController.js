@@ -18,7 +18,7 @@ async function getManagerStorage(req, res) {
                 COUNT(*)::int AS total_products,
 
                 COUNT(*) FILTER (
-                    WHERE ckpii.on_hand_qty < 50
+                    WHERE ckpii.on_hand_qty < ckpii.min_qty
                 )::int AS low_stock,
 
                 COUNT(*) FILTER (
