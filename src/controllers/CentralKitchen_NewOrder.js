@@ -208,6 +208,103 @@ async function getNewOrderDetail(req, res) {
     }
 }
 
+async function deductInventoryForOrder(client, centralKitchenId, orderId) {
+    const itemsRs = await client.query(
+        `
+        SELECT
+            oi.order_item_id,
+            oi.product_id,
+            oi.qty,
+            p.name AS product_name
+        FROM order_item oi
+        JOIN product p
+            ON p.product_id = oi.product_id
+        WHERE oi.order_id = $1
+        ORDER BY oi.order_item_id ASC
+        `,
+        [orderId]
+    );
+
+    if (!itemsRs.rows.length) {
+        throw new ApiError(
+            400,
+            "Đơn hàng không có sản phẩm để xử lý",
+            "ORDER_ITEMS_EMPTY"
+        );
+    }
+
+    const deductedItems = [];
+
+    for (const item of itemsRs.rows) {
+        const stockRs = await client.query(
+            `
+            SELECT
+                inventory_item_id,
+                on_hand_qty,
+                min_qty
+            FROM central_kitchen_product_inventory_item
+            WHERE central_kitchen_id = $1
+              AND product_id = $2
+            FOR UPDATE
+            `,
+            [centralKitchenId, item.product_id]
+        );
+
+        if (!stockRs.rows.length) {
+            throw new ApiError(
+                400,
+                "Không đủ tồn kho",
+                "INSUFFICIENT_INVENTORY",
+                {
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    required_qty: Number(item.qty),
+                    available_qty: 0,
+                }
+            );
+        }
+
+        const stock = stockRs.rows[0];
+        const availableQty = Number(stock.on_hand_qty);
+        const requiredQty = Number(item.qty);
+
+        if (availableQty < requiredQty) {
+            throw new ApiError(
+                400,
+                "Không đủ tồn kho",
+                "INSUFFICIENT_INVENTORY",
+                {
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    required_qty: requiredQty,
+                    available_qty: availableQty,
+                    min_qty: Number(stock.min_qty || 0),
+                }
+            );
+        }
+
+        await client.query(
+            `
+            UPDATE central_kitchen_product_inventory_item
+            SET 
+                on_hand_qty = on_hand_qty - $1,
+                last_updated_at = NOW()
+            WHERE inventory_item_id = $2
+            `,
+            [requiredQty, stock.inventory_item_id]
+        );
+
+        deductedItems.push({
+            product_id: item.product_id,
+            product_name: item.product_name,
+            deducted_qty: requiredQty,
+            remaining_qty: availableQty - requiredQty,
+        });
+    }
+
+    return deductedItems;
+}
+
 async function acceptNewOrder(req, res) {
     const client = await pool.connect();
 
@@ -219,7 +316,6 @@ async function acceptNewOrder(req, res) {
 
         await client.query("BEGIN");
 
-        // Lock order trước để tránh accept cùng lúc
         const orderRs = await client.query(
             `
             SELECT order_id, order_code, status, franchise_store_id
@@ -249,14 +345,32 @@ async function acceptNewOrder(req, res) {
             );
         }
 
-        // Trừ kho trước
-        const deductedItems = await deductInventoryForOrder(
-            client,
-            centralKitchenId,
-            orderId
-        );
+        let deductedItems;
+        try {
+            deductedItems = await deductInventoryForOrder(
+                client,
+                centralKitchenId,
+                orderId
+            );
+        } catch (error) {
+            console.error("deductInventoryForOrder error:", error);
 
-        // Sau đó mới chuyển trạng thái đơn
+            if (error instanceof ApiError) {
+                if (error.errorCode === "INSUFFICIENT_INVENTORY") {
+                    throw new ApiError(
+                        400,
+                        "Không đủ tồn kho",
+                        "INSUFFICIENT_INVENTORY",
+                        error.data || null
+                    );
+                }
+
+                throw error;
+            }
+
+            throw error;
+        }
+
         const upRs = await client.query(
             `
             UPDATE orders
@@ -272,7 +386,6 @@ async function acceptNewOrder(req, res) {
 
         const updatedOrder = upRs.rows[0];
 
-        // Tìm user thuộc franchise store để gửi notification
         const staffRs = await client.query(
             `
             SELECT fs.user_id
@@ -325,7 +438,6 @@ async function acceptNewOrder(req, res) {
 
         await client.query("COMMIT");
 
-        // REALTIME
         const io = req.app.get("io");
 
         for (const notification of notifications) {
@@ -359,9 +471,9 @@ async function acceptNewOrder(req, res) {
         if (e instanceof ApiError) {
             return res.status(e.status).json({
                 success: false,
-                data: e.data,
+                data: e.data || null,
                 message: e.message,
-                error_code: e.errorCode,
+                error_code: e.errorCode || null,
             });
         }
 
