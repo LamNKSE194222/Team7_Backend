@@ -41,6 +41,7 @@ async function getCentralKitchenMaterialsInventory(req, res) {
         m.name AS material_name,
         m.uom,
         ckii.on_hand_qty,
+        m.min_stock,
         ckii.expiry_date,
         CASE 
           WHEN ckii.expiry_date IS NULL THEN NULL
